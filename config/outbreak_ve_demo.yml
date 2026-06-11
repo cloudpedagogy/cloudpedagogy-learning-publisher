@@ -4,7 +4,7 @@ module:
   title: "Outbreak Investigation and Vaccine Effectiveness"
   description: "Demonstration course showing Word-first structured publishing with public health content."
   default_render_mode: multi_page
-  default_subpage_count: 3
+  default_subpage_count: 1
 
 sessions:
   - id: OUTBREAK_VE_DEMO-se01
@@ -25,21 +25,11 @@ sessions:
         kind: section_overview
         number: 1
         navigation_style: numbered_subpages
-        subpage_count: 3
+        subpage_count: 1
 
         subpages:
           - id: OUTBREAK_VE_DEMO-se01-sec01-sp01
-            title: "Introducing the Outbreak"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/01_vaccine_effectiveness_outbreak.docx"
-
-          - id: OUTBREAK_VE_DEMO-se01-sec01-sp02
-            title: "Why Vaccine Effectiveness Matters"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/01_vaccine_effectiveness_outbreak.docx"
-
-          - id: OUTBREAK_VE_DEMO-se01-sec01-sp03
-            title: "Key Public Health Questions"
+            title: "Outbreak Context"
             kind: text_page
             source_docx: "imports/outbreak_ve_demo/docx/01_vaccine_effectiveness_outbreak.docx"
 
@@ -48,21 +38,11 @@ sessions:
         kind: section_overview
         number: 2
         navigation_style: numbered_subpages
-        subpage_count: 3
+        subpage_count: 1
 
         subpages:
           - id: OUTBREAK_VE_DEMO-se01-sec02-sp01
-            title: "Observed Data"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/02_measures_and_data.docx"
-
-          - id: OUTBREAK_VE_DEMO-se01-sec02-sp02
-            title: "Relative Risk"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/02_measures_and_data.docx"
-
-          - id: OUTBREAK_VE_DEMO-se01-sec02-sp03
-            title: "Formula for Vaccine Effectiveness"
+            title: "Measures and Data"
             kind: text_page
             source_docx: "imports/outbreak_ve_demo/docx/02_measures_and_data.docx"
 
@@ -71,21 +51,11 @@ sessions:
         kind: section_overview
         number: 3
         navigation_style: numbered_subpages
-        subpage_count: 3
+        subpage_count: 1
 
         subpages:
           - id: OUTBREAK_VE_DEMO-se01-sec03-sp01
-            title: "Step-by-Step Calculation"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/03_calculating_vaccine_effectiveness.docx"
-
-          - id: OUTBREAK_VE_DEMO-se01-sec03-sp02
-            title: "Worked Example"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/03_calculating_vaccine_effectiveness.docx"
-
-          - id: OUTBREAK_VE_DEMO-se01-sec03-sp03
-            title: "Check Your Understanding"
+            title: "Calculating Vaccine Effectiveness"
             kind: text_page
             source_docx: "imports/outbreak_ve_demo/docx/03_calculating_vaccine_effectiveness.docx"
 
@@ -107,21 +77,11 @@ sessions:
         kind: section_overview
         number: 1
         navigation_style: numbered_subpages
-        subpage_count: 3
+        subpage_count: 1
 
         subpages:
           - id: OUTBREAK_VE_DEMO-se02-sec01-sp01
-            title: "Risk by Vaccination Status"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/04_visualising_outbreak_data.docx"
-
-          - id: OUTBREAK_VE_DEMO-se02-sec01-sp02
-            title: "Epidemic Curve"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/04_visualising_outbreak_data.docx"
-
-          - id: OUTBREAK_VE_DEMO-se02-sec01-sp03
-            title: "Using R for Public Health Visualisation"
+            title: "Visualising Results"
             kind: text_page
             source_docx: "imports/outbreak_ve_demo/docx/04_visualising_outbreak_data.docx"
 
@@ -130,21 +90,11 @@ sessions:
         kind: section_overview
         number: 2
         navigation_style: numbered_subpages
-        subpage_count: 3
+        subpage_count: 1
 
         subpages:
           - id: OUTBREAK_VE_DEMO-se02-sec02-sp01
-            title: "Interpreting Vaccine Effectiveness"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/05_interpreting_vaccine_effectiveness.docx"
-
-          - id: OUTBREAK_VE_DEMO-se02-sec02-sp02
-            title: "Assumptions and Limitations"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/05_interpreting_vaccine_effectiveness.docx"
-
-          - id: OUTBREAK_VE_DEMO-se02-sec02-sp03
-            title: "Common Misinterpretations"
+            title: "Interpreting Evidence"
             kind: text_page
             source_docx: "imports/outbreak_ve_demo/docx/05_interpreting_vaccine_effectiveness.docx"
 
@@ -153,20 +103,10 @@ sessions:
         kind: section_overview
         number: 3
         navigation_style: numbered_subpages
-        subpage_count: 3
+        subpage_count: 1
 
         subpages:
           - id: OUTBREAK_VE_DEMO-se02-sec03-sp01
-            title: "Reading the Outbreak Report"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/06_reporting_and_public_health_action.docx"
-
-          - id: OUTBREAK_VE_DEMO-se02-sec03-sp02
-            title: "Communicating Findings"
-            kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/06_reporting_and_public_health_action.docx"
-
-          - id: OUTBREAK_VE_DEMO-se02-sec03-sp03
-            title: "Public Health Implications"
+            title: "Reporting and Action"
             kind: text_page
             source_docx: "imports/outbreak_ve_demo/docx/06_reporting_and_public_health_action.docx"

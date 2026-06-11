@@ -95,9 +95,17 @@ YouTubeEmbed :: https://www.youtube.com/watch?v=yt3e8Ng0mf0
 
 PanoptoEmbed :: https://lshtm.cloud.panopto.eu/Panopto/Pages/Viewer.aspx?id=d19ba573-9ad1-480b-95db-b3ed01014aab
 
-## Visualising the Results
+## 
+
+## R Code Demos  R Code and Output
 
 R Code
+
+R Mode :: static
+
+Echo :: true
+
+Output :: true
 
 Alt :: Bar chart showing risk of infection for vaccinated and unvaccinated groups.
 
@@ -111,24 +119,149 @@ population \<- c(500, 500)
 
 risk \<- cases / population
 
-barplot(risk, names.arg = group, col = c(\"steelblue\", \"tomato\"),
+barplot(
 
-main = \"Risk of Infection by Vaccination Status\")
+risk,
+
+names.arg = group,
+
+col = c(\"steelblue\", \"tomato\"),
+
+main = \"Risk of Infection by Vaccination Status\"
+
+)
 
 END R Code
 
 ## R Code Only
 
-R Example
+R Code
 
-group \<- c(\"Vaccinated\", \"Unvaccinated\")\
-cases \<- c(5, 25)\
-population \<- c(500, 500)\
-risk \<- cases / population\
-barplot(risk, names.arg = group, col = c(\"steelblue\", \"tomato\"),\
-main = \"Risk of Infection by Vaccination Status\")
+R Mode :: static
 
-END R Example
+Echo :: true
+
+Output :: false
+
+group \<- c(\"Vaccinated\", \"Unvaccinated\")
+
+cases \<- c(5, 25)
+
+population \<- c(500, 500)
+
+risk \<- cases / population
+
+barplot(
+
+risk,
+
+names.arg = group,
+
+col = c(\"steelblue\", \"tomato\"),
+
+main = \"Risk of Infection by Vaccination Status\"
+
+)
+
+END R Code
+
+## R Output Only
+
+R Code
+
+R Mode :: static
+
+Echo :: false
+
+Output :: true
+
+Alt :: Bar chart comparing infection risk between vaccinated and unvaccinated groups.
+
+Caption :: Risk of infection by vaccination status
+
+group \<- c(\"Vaccinated\", \"Unvaccinated\")
+
+cases \<- c(5, 25)
+
+population \<- c(500, 500)
+
+risk \<- cases / population
+
+barplot(
+
+risk,
+
+names.arg = group,
+
+col = c(\"steelblue\", \"tomato\"),
+
+main = \"Risk of Infection by Vaccination Status\"
+
+)
+
+END R Code
+
+## Interactive R Code
+
+R Code
+
+R Mode :: webr
+
+Echo :: true
+
+Output :: true
+
+Alt :: Epidemic curve showing daily outbreak case counts.
+
+Caption :: Simulated Epidemic Curve
+
+days \<- 1:10
+
+cases \<- c(2, 4, 7, 12, 18, 15, 11, 7, 4, 2)
+
+barplot(
+
+cases,
+
+names.arg = days,
+
+col = \"steelblue\",
+
+xlab = \"Day\",
+
+ylab = \"Number of Cases\",
+
+main = \"Simulated Epidemic Curve\"
+
+)
+
+END R Code
+
+## R Code Table example
+
+R Code
+
+R Mode :: webr
+
+Echo :: true
+
+Output :: true
+
+data \<- data.frame(
+
+Group = c(\"Vaccinated\", \"Unvaccinated\"),
+
+Cases = c(5, 25),
+
+Population = c(500, 500)
+
+)
+
+data\$Risk \<- data\$Cases / data\$Population
+
+data
+
+END R Code
 
 ## Interpreting the Results
 
@@ -141,7 +274,7 @@ Limitations :: Confounding factors such as age, immunity, or healthcare access m
 
 Image :: resources/images/epidemic-curve.png\
 Alt :: Epidemic curve showing number of measles cases over time by vaccination status\
-Caption :: Figure 1. Epidemic curve comparing vaccinated and unvaccinated groups.\
+Caption :: Epidemic curve comparing vaccinated and unvaccinated groups.\
 Width :: 70%
 
 ## Outbreak Report
@@ -177,6 +310,20 @@ Explanation :: Vaccine effectiveness compares the risk of disease in vaccinated 
 
 Callout :: tip\
 Text :: Vaccination significantly reduces the likelihood of infection and severe disease, even if it does not eliminate risk entirely.
+
+## Binomial Theorem equation
+
+$$(x + a)^{n} = \sum_{k = 0}^{n}{\binom{n}{k}x^{k}a^{n - k}}$$
+
+## Latex Equations Approach
+
+**Display equation example**
+
+\$\$\
+P(X=x)=\\binom{n}{x}p\^x(1-p)\^{n-x}\
+\$\$
+
+## 
 
 ## Further Reading
 

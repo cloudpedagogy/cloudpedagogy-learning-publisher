@@ -26,71 +26,90 @@ def convert_docx_to_md(docx_path: Path, md_path: Path):
 
 def normalize_metadata_blocks(content: str) -> str:
     """
-    Pandoc often converts directive-style Word content into markdown lines
-    ending with backslashes. This function normalizes supported interaction
-    blocks so downstream parsers can detect them reliably.
+    Normalize Word/Pandoc directive blocks while preserving
+    line structure required for interaction parsing.
+
+    Pandoc may emit Word hard line breaks as trailing backslashes.
+    For directive blocks, those backslashes need to become real
+    newlines so parsers can detect markers such as R Code,
+    R Mode ::, Alt ::, Caption ::, and END R Code.
     """
-    directive_starters = [
+
+    directive_prefixes = [
         "Callout ::",
+        "Text ::",
         "Reveal",
         "SelfCheck",
+        "Question ::",
+        "Answer ::",
+        "Option ::",
+        "Explanation ::",
         "R Code",
         "END R Code",
         "R Example",
         "END R Example",
+        "R Mode ::",
+        "Echo ::",
+        "Output ::",
+        "Alt ::",
+        "Caption ::",
         "Tabs",
+        "Interpretation ::",
+        "Assumptions ::",
+        "Limitations ::",
         "Image ::",
+        "Width ::",
         "File ::",
+        "Display ::",
+        "Label ::",
         "Quiz",
         "YouTubeEmbed ::",
         "PanoptoEmbed ::",
     ]
 
-    directive_fields = [
-        "Text ::",
-        "Question ::",
-        "Answer ::",
-        "Option ::",
-        "Explanation ::",
-        "Interpretation ::",
-        "Assumptions ::",
-        "Limitations ::",
-        "Alt ::",
-        "Width ::",
-        "Display ::",
-        "Label ::",
-        "Caption ::",
-    ]
+    # Convert Pandoc hard-line-break markers into actual line breaks.
+    # Example:
+    #   R Code\
+    #   R Mode :: webr\
+    # becomes:
+    #   R Code
+    #   R Mode :: webr
+    content = re.sub(r"\\\s*\n", "\n", content)
 
-    lines = content.split("\n")
-    normalized = []
+    normalized_lines = []
 
-    for line in lines:
+    for raw_line in content.splitlines():
+        line = raw_line.rstrip()
         stripped = line.strip()
 
-        if stripped.endswith("\\"):
-            stripped = stripped[:-1].rstrip()
-
         if not stripped:
-            normalized.append("")
+            normalized_lines.append("")
+            continue
+
+        if any(stripped.startswith(prefix) for prefix in directive_prefixes):
+            normalized_lines.append(stripped)
             continue
 
         if re.match(r"^Step\s+\d+\s*::", stripped):
-            normalized.append(stripped)
+            normalized_lines.append(stripped)
             continue
 
-        if any(stripped.startswith(prefix) for prefix in directive_starters + directive_fields):
-            normalized.append(stripped)
-        else:
-            normalized.append(line.rstrip())
+        normalized_lines.append(line)
 
-    return "\n".join(normalized)
+    return "\n".join(normalized_lines)
 
 
 def normalize_math_blocks(content: str) -> str:
     """
-    Unescape display-math delimiters that Pandoc may emit as literal text.
+    Normalize LaTeX math emitted by Pandoc/Word.
+
+    Fixes:
+    - escaped $$ delimiters
+    - over-escaped inline/display math delimiters
+    - escaped exponent operators
+    - double-escaped LaTeX commands
     """
+
     normalized_lines = []
 
     for line in content.split("\n"):
@@ -98,8 +117,18 @@ def normalize_math_blocks(content: str) -> str:
 
         if stripped == r"\$\$":
             normalized_lines.append("$$")
-        else:
-            normalized_lines.append(line)
+            continue
+
+        line = line.replace(r"\\[", r"\[")
+        line = line.replace(r"\\]", r"\]")
+        line = line.replace(r"\\(", r"\(")
+        line = line.replace(r"\\)", r"\)")
+        line = line.replace(r"\^", "^")
+
+        # Fix double-escaped LaTeX commands
+        line = line.replace(r"\\binom", r"\binom")
+
+        normalized_lines.append(line)
 
     return "\n".join(normalized_lines)
 
@@ -125,8 +154,10 @@ def clean_r_code(code: str) -> str:
         line = line.replace(r"\"", '"')
         line = line.replace(r"\<", "<")
         line = line.replace(r"\>", ">")
+        line = line.replace(r"\$", "$")
 
-        if line.strip():  # 🔥 removes blank lines
+
+        if line.strip():
             cleaned_lines.append(line)
 
     return "\n".join(cleaned_lines).strip()
@@ -149,10 +180,7 @@ def rewrite_asset_path(asset_path: str, qmd_path: Path, course_dir: Path) -> str
 
 
 def copy_site_resources(course_dir: Path):
-    """
-    Copy top-level project resources into the generated course directory so
-    rendered HTML pages can link to them.
-    """
+    """Copy top-level project resources into the generated course directory."""
     source_resources = Path("resources")
     if not source_resources.exists():
         click.echo(click.style("No top-level resources/ directory found; skipping resource copy", fg="yellow"))
@@ -266,12 +294,36 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
             continue
 
         malformed_match = re.match(
-            r"^(YouTubeEmbed|PanoptoEmbed|Image|File|Callout|Question|Option|Answer|Caption|Alt|Width|Display|Label)\s*:\s+\S+",
+            r"^(YouTubeEmbed|PanoptoEmbed|Image|File|Callout|Question|Option|Answer|Caption|Alt|Width|Display|Label|R Mode|Echo|Output)\s*:\s+\S+",
             line,
             re.IGNORECASE,
         )
         if malformed_match:
             warnings.append(f"{page_id} line {idx}: possible directive syntax error. Use '::' not ':'.")
+
+        r_mode_match = re.match(r"^R Mode\s*::\s*(.+)$", line, re.IGNORECASE)
+        if r_mode_match:
+            mode = r_mode_match.group(1).strip().rstrip("\\").strip().lower()
+            if mode not in ["static", "r", "webr"]:
+                warnings.append(
+                    f"{page_id} line {idx}: unknown R Mode '{mode}'. Use 'static' or 'webr'."
+                )
+
+        echo_match = re.match(r"^Echo\s*::\s*(.+)$", line, re.IGNORECASE)
+        if echo_match:
+            echo_value = echo_match.group(1).strip().rstrip("\\").strip().lower()
+            if echo_value not in ["true", "false", "yes", "no"]:
+                warnings.append(
+                    f"{page_id} line {idx}: unknown Echo value '{echo_value}'. Use 'true' or 'false'."
+                )
+
+        output_match = re.match(r"^Output\s*::\s*(.+)$", line, re.IGNORECASE)
+        if output_match:
+            output_value = output_match.group(1).strip().rstrip("\\").strip().lower()
+            if output_value not in ["true", "false", "yes", "no"]:
+                warnings.append(
+                    f"{page_id} line {idx}: unknown Output value '{output_value}'. Use 'true' or 'false'."
+                )
 
         if re.match(r"^(?:#+\s*)?Quiz\s*$", line, re.IGNORECASE):
             if quiz_open:
@@ -423,10 +475,25 @@ def parse_r_code(content: str) -> tuple[str, int]:
     Preferred syntax:
 
     R Code
+    R Mode :: static
+    Echo :: true
+    Output :: true
     Alt :: Description of generated figure
     Caption :: Visible figure caption
     <R code>
     END R Code
+
+    R Mode options:
+    - static/default/r -> ```{r}
+    - webr -> ```{webr-r}
+
+    Echo options:
+    - true/default -> show code
+    - false -> hide code
+
+    Output options:
+    - true/default -> execute code and show generated output
+    - false -> do not execute code; useful for code-only examples
     """
     lines = content.split("\n")
     new_lines = []
@@ -436,21 +503,45 @@ def parse_r_code(content: str) -> tuple[str, int]:
     code_lines = []
     fig_alt = ""
     fig_cap = ""
+    r_mode = "static"
+    echo = "true"
+    output = "true"
 
     def escape_chunk_option_text(text: str) -> str:
         return text.replace("\\", "\\\\").replace('"', '\\"')
 
+    def normalize_bool(value: str, default: str = "true") -> str:
+        value = (value or default).strip().rstrip("\\").strip().lower()
+        if value in ["false", "no"]:
+            return "false"
+        if value in ["true", "yes"]:
+            return "true"
+        return default
+
     def flush_code_block():
-        nonlocal code_lines, new_lines, fig_alt, fig_cap
+        nonlocal code_lines, new_lines, fig_alt, fig_cap, r_mode, echo, output
 
         cleaned_code = clean_r_code("\n".join(code_lines))
+        chunk_engine = "webr-r" if r_mode.lower() == "webr" else "r"
+        echo_value = normalize_bool(echo, default="true")
+        output_value = normalize_bool(output, default="true")
 
-        new_lines.append("```{r}")
+        new_lines.append(f"```{{{chunk_engine}}}")
 
-        if fig_alt:
-            new_lines.append(f'#| fig-alt: "{escape_chunk_option_text(fig_alt)}"')
-        if fig_cap:
-            new_lines.append(f'#| fig-cap: "{escape_chunk_option_text(fig_cap)}"')
+        # Standard R chunks support Quarto execution/display metadata.
+        # WebR blocks are kept simpler so learners can edit/run directly in the browser.
+        if chunk_engine == "r":
+            new_lines.append(f"#| echo: {echo_value}")
+
+            # Output :: false is used for code-only examples.
+            # Using eval: false prevents charts/tables/results from being generated.
+            if output_value == "false":
+                new_lines.append("#| eval: false")
+
+            if fig_alt:
+                new_lines.append(f'#| fig-alt: "{escape_chunk_option_text(fig_alt)}"')
+            if fig_cap:
+                new_lines.append(f'#| fig-cap: "{escape_chunk_option_text(fig_cap)}"')
 
         if cleaned_code:
             new_lines.append(cleaned_code)
@@ -460,6 +551,9 @@ def parse_r_code(content: str) -> tuple[str, int]:
         code_lines = []
         fig_alt = ""
         fig_cap = ""
+        r_mode = "static"
+        echo = "true"
+        output = "true"
 
     for line in lines:
         stripped = line.strip()
@@ -471,6 +565,9 @@ def parse_r_code(content: str) -> tuple[str, int]:
                 code_lines = []
                 fig_alt = ""
                 fig_cap = ""
+                r_mode = "static"
+                echo = "true"
+                output = "true"
                 continue
             else:
                 new_lines.append(line)
@@ -489,14 +586,23 @@ def parse_r_code(content: str) -> tuple[str, int]:
                 new_lines.append(line)
                 in_code_block = False
             else:
+                mode_match = re.match(r"^R Mode\s*::\s*(.*)$", stripped, re.IGNORECASE)
+                echo_match = re.match(r"^Echo\s*::\s*(.*)$", stripped, re.IGNORECASE)
+                output_match = re.match(r"^Output\s*::\s*(.*)$", stripped, re.IGNORECASE)
                 alt_match = re.match(r"^Alt\s*::\s*(.*)$", stripped, re.IGNORECASE)
                 cap_match = re.match(r"^Caption\s*::\s*(.*)$", stripped, re.IGNORECASE)
 
-                if alt_match:
+                if mode_match:
+                    r_mode = mode_match.group(1).strip().rstrip("\\").strip().lower()
+                elif echo_match:
+                    echo = echo_match.group(1).strip().rstrip("\\").strip().lower()
+                elif output_match:
+                    output = output_match.group(1).strip().rstrip("\\").strip().lower()
+                elif alt_match:
                     fig_alt = alt_match.group(1).strip()
                 elif cap_match:
                     fig_cap = cap_match.group(1).strip()
-                elif stripped not in ["{r}", "`{r}`", "```{r}", "```"]:
+                elif stripped not in ["{r}", "`{r}`", "```{r}", "```{webr-r}", "```"]:
                     code_lines.append(line)
 
     if in_code_block:
@@ -507,7 +613,6 @@ def parse_r_code(content: str) -> tuple[str, int]:
         click.echo(f"  Rendering {count} fenced code chunks")
 
     return "\n".join(new_lines), count
-
 
 def parse_tabs(content: str) -> tuple[str, int]:
     """Detect and render localized Tab interactions (Quarto tabset)."""
@@ -719,9 +824,7 @@ def parse_reveal(content: str) -> tuple[str, int]:
 
 
 def parse_quiz(content: str) -> tuple[str, int]:
-    """
-    Parse Word-authored Quiz blocks into a static formative quiz UI.
-    """
+    """Parse Word-authored Quiz blocks into a static formative quiz UI."""
     lines = content.split("\n")
     new_lines = []
     count = 0
@@ -863,13 +966,19 @@ def parse_images(content: str, qmd_path: Path, course_dir: Path) -> tuple[str, i
 
             i += 1
 
-        image_line = f"![{alt}]({path})"
+        visible_caption = caption or alt
+        image_line = f"![{visible_caption}]({path})"
+
+        attributes = []
         if width:
-            image_line += f"{{width='{width}'}}"
+            attributes.append(f"width='{width}'")
+        if alt:
+            attributes.append(f'fig-alt="{alt}"')
+
+        if attributes:
+            image_line += "{" + " ".join(attributes) + "}"
 
         new_lines.append(image_line)
-        if caption:
-            new_lines.append(caption)
         new_lines.append("")
         count += 1
 
@@ -1048,7 +1157,7 @@ def insert_markdown_into_qmd(md_path: Path, qmd_path: Path, course_dir: Path):
         pattern = re.escape(IMPORT_START) + r".*?" + re.escape(IMPORT_END)
         new_qmd_content = re.sub(
             pattern,
-            f"{IMPORT_START}\n\n{imported_content}\n\n{IMPORT_END}",
+            lambda m: f"{IMPORT_START}\n\n{imported_content}\n\n{IMPORT_END}",
             qmd_content,
             flags=re.DOTALL,
         )

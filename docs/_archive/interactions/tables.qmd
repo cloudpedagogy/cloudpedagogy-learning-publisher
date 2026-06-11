@@ -1,9 +1,0 @@
----
-title: "Tables Interaction"
----
-
-## Overview
-Table interactions are planned for future development. This page serves as a placeholder for structured data presentation scaffolds.
-
-## Future Plans
-We intend to support semantic table definitions that can be rendered into accessible Quarto tables or interactive data grids.
