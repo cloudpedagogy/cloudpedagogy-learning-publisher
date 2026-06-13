@@ -112,3 +112,10 @@ For deep-dives into the architecture, commands, and workflows, please see the `d
 - [Workflows](docs/WORKFLOWS.md): Detailed guides on authoring in YAML and Word.
 - [Usage Reference](docs/USAGE.md): Complete CLI documentation.
 - [Installation](docs/INSTALLATION.md): Detailed setup steps.
+
+
+## Licence
+
+This project is released under the MIT Licence.
+
+Part of the CloudPedagogy Governance Engineering ecosystem.
