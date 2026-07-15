@@ -1,0 +1,41 @@
+---
+title: "Section 2: Interpreting Evidence"
+id: "OUTBREAK_VE_DEMO-se02-sec02"
+section_id: "OUTBREAK_VE_DEMO-se02-sec02"
+session_id: "OUTBREAK_VE_DEMO-se02"
+toc: True
+---
+
+
+
+
+### In this section
+<br>
+
+- [Interpreting Evidence](OUTBREAK_VE_DEMO-se02-sec02-sp01.qmd)
+
+<!-- START_NAVIGATION -->
+
+
+```{=html}
+<div class="custom-page-navigation">
+    <div class="nav-prev">
+        
+        <a href="../01-visualising-results/OUTBREAK_VE_DEMO-se02-sec01-sp01.qmd">
+            <span class="nav-label">← Previous</span>
+            <span class="nav-title">Visualising Results</span>
+        </a>
+        
+    </div>
+    <div class="nav-next">
+        
+        <a href="OUTBREAK_VE_DEMO-se02-sec02-sp01.qmd">
+            <span class="nav-label">Next →</span>
+            <span class="nav-title">Interpreting Evidence</span>
+        </a>
+        
+    </div>
+</div>
+```
+
+<!-- END_NAVIGATION -->

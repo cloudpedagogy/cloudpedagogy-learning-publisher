@@ -26,12 +26,11 @@ sessions:
         number: 1
         navigation_style: numbered_subpages
         subpage_count: 1
-
         subpages:
           - id: OUTBREAK_VE_DEMO-se01-sec01-sp01
             title: "Outbreak Context"
             kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/01_vaccine_effectiveness_outbreak.docx"
+            source_docx: "imports/courses/outbreak_ve_demo/docx/01_vaccine_effectiveness_outbreak.docx"
 
       - id: OUTBREAK_VE_DEMO-se01-sec02
         title: "Measures and Data"
@@ -39,12 +38,11 @@ sessions:
         number: 2
         navigation_style: numbered_subpages
         subpage_count: 1
-
         subpages:
           - id: OUTBREAK_VE_DEMO-se01-sec02-sp01
             title: "Measures and Data"
             kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/02_measures_and_data.docx"
+            source_docx: "imports/courses/outbreak_ve_demo/docx/02_measures_and_data.docx"
 
       - id: OUTBREAK_VE_DEMO-se01-sec03
         title: "Calculating Vaccine Effectiveness"
@@ -52,12 +50,11 @@ sessions:
         number: 3
         navigation_style: numbered_subpages
         subpage_count: 1
-
         subpages:
           - id: OUTBREAK_VE_DEMO-se01-sec03-sp01
             title: "Calculating Vaccine Effectiveness"
             kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/03_calculating_vaccine_effectiveness.docx"
+            source_docx: "imports/courses/outbreak_ve_demo/docx/03_calculating_vaccine_effectiveness.docx"
 
   - id: OUTBREAK_VE_DEMO-se02
     code: SE02
@@ -78,12 +75,11 @@ sessions:
         number: 1
         navigation_style: numbered_subpages
         subpage_count: 1
-
         subpages:
           - id: OUTBREAK_VE_DEMO-se02-sec01-sp01
             title: "Visualising Results"
             kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/04_visualising_outbreak_data.docx"
+            source_docx: "imports/courses/outbreak_ve_demo/docx/04_visualising_outbreak_data.docx"
 
       - id: OUTBREAK_VE_DEMO-se02-sec02
         title: "Interpreting Evidence"
@@ -91,12 +87,11 @@ sessions:
         number: 2
         navigation_style: numbered_subpages
         subpage_count: 1
-
         subpages:
           - id: OUTBREAK_VE_DEMO-se02-sec02-sp01
             title: "Interpreting Evidence"
             kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/05_interpreting_vaccine_effectiveness.docx"
+            source_docx: "imports/courses/outbreak_ve_demo/docx/05_interpreting_vaccine_effectiveness.docx"
 
       - id: OUTBREAK_VE_DEMO-se02-sec03
         title: "Reporting and Action"
@@ -104,9 +99,8 @@ sessions:
         number: 3
         navigation_style: numbered_subpages
         subpage_count: 1
-
         subpages:
           - id: OUTBREAK_VE_DEMO-se02-sec03-sp01
             title: "Reporting and Action"
             kind: text_page
-            source_docx: "imports/outbreak_ve_demo/docx/06_reporting_and_public_health_action.docx"
+            source_docx: "imports/courses/outbreak_ve_demo/docx/06_reporting_and_public_health_action.docx"

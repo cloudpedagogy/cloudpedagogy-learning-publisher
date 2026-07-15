@@ -1,5 +1,6 @@
 from pathlib import Path
 from urllib.parse import urlparse
+import os
 import subprocess
 import sys
 import yaml
@@ -270,6 +271,190 @@ def tidy_spacing(text: str) -> str:
     return text.strip()
 
 
+
+def is_external_or_anchor_path(path: str) -> bool:
+    """Return True for paths that must not be rewritten."""
+    path = path.strip()
+    return bool(
+        re.match(
+            r"^(?:https?://|mailto:|tel:|data:|javascript:|#|/)",
+            path,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def split_markdown_destination(destination: str) -> tuple[str, str]:
+    """
+    Split a Markdown destination into its path and optional quoted title.
+
+    Examples:
+        images/chart.png
+        images/chart.png "Chart title"
+    """
+    destination = destination.strip()
+    match = re.match(r'^(.*?)(\s+["\'].*["\'])$', destination)
+
+    if match:
+        return match.group(1).strip(), match.group(2)
+
+    return destination, ""
+
+
+def resolve_source_asset(
+    raw_path: str,
+    source_qmd: Path,
+    course_dir: Path,
+) -> Path | None:
+    """
+    Resolve a local asset path as it was understood by the source QMD page.
+
+    The normal case is a path relative to source_qmd.parent, such as:
+        ../../resources/images/chart.png
+
+    A course-root fallback is also supported for paths such as:
+        resources/images/chart.png
+    """
+    clean_path = raw_path.strip().replace("\\", "/")
+
+    if not clean_path or is_external_or_anchor_path(clean_path):
+        return None
+
+    # Remove angle brackets sometimes used around Markdown destinations.
+    if clean_path.startswith("<") and clean_path.endswith(">"):
+        clean_path = clean_path[1:-1].strip()
+
+    candidates = [
+        (source_qmd.parent / clean_path).resolve(),
+        (course_dir / clean_path).resolve(),
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    return None
+
+
+def path_relative_to_handbook(asset_path: Path, handbook_file: Path) -> str:
+    """Return a portable path from the handbook file to an existing asset."""
+    return os.path.relpath(
+        asset_path,
+        start=handbook_file.parent,
+    ).replace("\\", "/")
+
+
+def rewrite_markdown_paths_for_handbook(
+    text: str,
+    source_qmd: Path,
+    course_dir: Path,
+    handbook_file: Path,
+) -> str:
+    """
+    Rewrite local Markdown image and link paths for the combined handbook.
+
+    Content copied from a nested QMD page may contain a path such as:
+        ../../resources/images/epidemic-curve.png
+
+    Once that content is moved into a handbook at the course root, the same
+    asset may need to be referenced as:
+        resources/images/epidemic-curve.png
+    """
+
+    markdown_pattern = re.compile(
+        r"(!?\[([^\]]*)\]\()([^)]+)(\))"
+    )
+
+    def repl(match: re.Match) -> str:
+        prefix = match.group(1)
+        destination = match.group(3)
+        suffix = match.group(4)
+
+        raw_path, optional_title = split_markdown_destination(destination)
+
+        if is_external_or_anchor_path(raw_path):
+            return match.group(0)
+
+        asset_path = resolve_source_asset(
+            raw_path,
+            source_qmd=source_qmd,
+            course_dir=course_dir,
+        )
+
+        if asset_path is None:
+            print(
+                "Warning: handbook asset path could not be resolved: "
+                f"{raw_path} (source: {source_qmd})"
+            )
+            return match.group(0)
+
+        rewritten = path_relative_to_handbook(asset_path, handbook_file)
+        return f"{prefix}{rewritten}{optional_title}{suffix}"
+
+    return markdown_pattern.sub(repl, text)
+
+
+def rewrite_html_asset_paths_for_handbook(
+    text: str,
+    source_qmd: Path,
+    course_dir: Path,
+    handbook_file: Path,
+) -> str:
+    """
+    Rewrite local src and href values in raw HTML retained in QMD content.
+
+    This primarily supports raw HTML images and other local embedded resources.
+    External URLs and fragment identifiers are left unchanged.
+    """
+
+    attribute_pattern = re.compile(
+        r'(?P<prefix>\b(?:src|href)\s*=\s*)(?P<quote>["\'])(?P<path>.*?)(?P=quote)',
+        flags=re.IGNORECASE,
+    )
+
+    def repl(match: re.Match) -> str:
+        raw_path = match.group("path").strip()
+
+        if is_external_or_anchor_path(raw_path):
+            return match.group(0)
+
+        asset_path = resolve_source_asset(
+            raw_path,
+            source_qmd=source_qmd,
+            course_dir=course_dir,
+        )
+
+        if asset_path is None:
+            return match.group(0)
+
+        rewritten = path_relative_to_handbook(asset_path, handbook_file)
+        quote = match.group("quote")
+        return f'{match.group("prefix")}{quote}{rewritten}{quote}'
+
+    return attribute_pattern.sub(repl, text)
+
+
+def rewrite_paths_for_handbook(
+    text: str,
+    source_qmd: Path,
+    course_dir: Path,
+    handbook_file: Path,
+) -> str:
+    """Rewrite all supported local asset paths before handbook cleaning."""
+    text = rewrite_markdown_paths_for_handbook(
+        text,
+        source_qmd=source_qmd,
+        course_dir=course_dir,
+        handbook_file=handbook_file,
+    )
+    text = rewrite_html_asset_paths_for_handbook(
+        text,
+        source_qmd=source_qmd,
+        course_dir=course_dir,
+        handbook_file=handbook_file,
+    )
+    return text
+
 def clean_content(text: str) -> str:
     text = strip_yaml_front_matter(text)
     text = remove_web_navigation(text)
@@ -309,8 +494,15 @@ def get_handbook_title(data: dict) -> str:
     return "Course Handbook"
 
 
-def add_page_content(out: list[str], course_dir: Path, href: str, title: str):
-    qmd_path = course_dir / href
+
+def add_page_content(
+    out: list[str],
+    course_dir: Path,
+    href: str,
+    title: str,
+    handbook_file: Path,
+):
+    qmd_path = (course_dir / href).resolve()
 
     if not qmd_path.exists():
         print(f"Missing file, skipped: {qmd_path}")
@@ -320,12 +512,28 @@ def add_page_content(out: list[str], course_dir: Path, href: str, title: str):
     out.append(f"### {title}")
     out.append("")
 
-    content = clean_content(qmd_path.read_text(encoding="utf-8"))
+    raw_content = qmd_path.read_text(encoding="utf-8")
+
+    # Rewrite paths while they still have the context of their source page.
+    rewritten_content = rewrite_paths_for_handbook(
+        raw_content,
+        source_qmd=qmd_path,
+        course_dir=course_dir,
+        handbook_file=handbook_file,
+    )
+
+    content = clean_content(rewritten_content)
     out.append(content)
     out.append("")
 
 
-def process_items(items, out: list[str], course_dir: Path, level: int = 1):
+def process_items(
+    items,
+    out: list[str],
+    course_dir: Path,
+    handbook_file: Path,
+    level: int = 1,
+):
     for item in items:
         if "section" in item:
             title = item["section"]
@@ -344,7 +552,13 @@ def process_items(items, out: list[str], course_dir: Path, level: int = 1):
             out.append("")
 
             if "contents" in item:
-                process_items(item["contents"], out, course_dir, level + 1)
+                process_items(
+                    item["contents"],
+                    out,
+                    course_dir,
+                    handbook_file,
+                    level + 1,
+                )
 
         elif "text" in item and "href" in item:
             href = item["href"]
@@ -352,8 +566,13 @@ def process_items(items, out: list[str], course_dir: Path, level: int = 1):
             if href.endswith("index.qmd"):
                 continue
 
-            add_page_content(out, course_dir, href, item["text"])
-
+            add_page_content(
+                out,
+                course_dir,
+                href,
+                item["text"],
+                handbook_file,
+            )
 
 def render_output(handbook_file: Path, output_format: str):
     subprocess.run(
@@ -408,7 +627,7 @@ def main():
         "",
     ]
 
-    process_items(contents, out, course_dir)
+    process_items(contents, out, course_dir, handbook_file)
 
     handbook_file.write_text("\n".join(out), encoding="utf-8")
     print(f"Created: {handbook_file}")

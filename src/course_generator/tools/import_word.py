@@ -16,12 +16,37 @@ def check_pandoc():
     return shutil.which("pandoc") is not None
 
 
-def convert_docx_to_md(docx_path: Path, md_path: Path):
-    """Convert a DOCX file to Markdown using Pandoc."""
-    cmd = ["pandoc", str(docx_path), "-t", "markdown", "--wrap=none", "-o", str(md_path)]
+def convert_docx_to_md(docx_path: Path, md_path: Path) -> Path:
+    """
+    Convert a DOCX file to Markdown using Pandoc, extracting embedded images.
+
+    Pandoc writes embedded DOCX media to a sibling folder such as:
+        imports/<course_id>/md/<doc_stem>_media/media/image1.png
+
+    The returned media_dir is later used only for reporting/debugging; image path
+    copying and rewriting are handled when the Markdown is inserted into the
+    target QMD because only then do we know the final QMD location.
+    """
+    media_dir = md_path.parent / f"{md_path.stem}_media"
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "pandoc",
+        str(docx_path),
+        "-t",
+        "markdown",
+        "--wrap=none",
+        f"--extract-media={media_dir}",
+        "-o",
+        str(md_path),
+    ]
+
     result = subprocess.run(cmd, capture_output=True, text=True)
+
     if result.returncode != 0:
         raise Exception(f"Pandoc conversion failed: {result.stderr}")
+
+    return media_dir
 
 
 def normalize_metadata_blocks(content: str) -> str:
@@ -155,6 +180,7 @@ def clean_r_code(code: str) -> str:
         line = line.replace(r"\<", "<")
         line = line.replace(r"\>", ">")
         line = line.replace(r"\$", "$")
+        line = line.replace(r"\~", "~")
 
 
         if line.strip():
@@ -177,6 +203,166 @@ def rewrite_asset_path(asset_path: str, qmd_path: Path, course_dir: Path) -> str
     target_asset = course_dir / asset_path
     relative_path = os.path.relpath(target_asset, start=qmd_parent)
     return relative_path.replace("\\", "/")
+
+
+def copy_imported_media_and_rewrite_paths(content: str, md_path: Path, qmd_path: Path, course_dir: Path) -> str:
+    """
+    Support embedded DOCX images converted by Pandoc.
+
+    Pandoc writes embedded Word images as normal Markdown image links, for example:
+        ![](01_r_and_rstudio_media/media/image1.jpg)
+
+    Those media files initially live under imports/<course_id>/md/, but Quarto renders
+    from the generated course directory. This function copies only Pandoc-extracted
+    media into course/<course_id>/imported_media/<doc_stem>/ and rewrites the Markdown
+    links so they are correct relative to the target QMD file.
+
+    This deliberately does not touch your existing course-engine image directives:
+        Image :: resources/images/example.png
+
+    Those are still handled later by parse_images().
+    """
+    md_parent = md_path.parent
+    media_dest_root = course_dir / "imported_media" / md_path.stem
+    media_dest_root.mkdir(parents=True, exist_ok=True)
+
+    def is_external_or_site_path(image_path: str) -> bool:
+        normalized = image_path.strip().replace("\\", "/")
+        return normalized.startswith((
+            "http://",
+            "https://",
+            "mailto:",
+            "#",
+            "/",
+            "../",
+            "resources/",
+            "imported_media/",
+        ))
+
+    def replace_match(match: re.Match) -> str:
+        alt_text = match.group(1)
+        image_path = match.group(2).strip().replace("\\", "/")
+
+        # Leave existing external/site/resource links alone.
+        if is_external_or_site_path(image_path):
+            return match.group(0)
+
+        # Safety guard: only rewrite Pandoc-extracted media paths.
+        # This avoids interfering with manually authored Markdown image links.
+        if "_media/" not in image_path and "_media/media/" not in image_path:
+            return match.group(0)
+
+        candidate_paths = [
+            md_parent / image_path,
+            Path(image_path),
+        ]
+
+        source_image = None
+
+        for candidate in candidate_paths:
+            if candidate.exists() and candidate.is_file():
+                source_image = candidate.resolve()
+                break
+
+        if source_image is None:
+            return match.group(0)
+
+        dest_image = media_dest_root / source_image.name
+        shutil.copy2(source_image, dest_image)
+
+        rel_path = os.path.relpath(dest_image, start=qmd_path.parent).replace("\\", "/")
+        return f"![{alt_text}]({rel_path})"
+
+    return re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", replace_match, content)
+
+
+def apply_following_alt_text_to_images(content: str) -> str:
+    """
+    Convert Moodle/Pandoc-style visible alt text lines into Quarto fig-alt metadata,
+    without creating visible captions.
+
+    Converts:
+
+        ![](path/to/image.png){width="5.8in"}
+        Alt text: Screenshot of the RStudio interface
+
+    into:
+
+        ![](path/to/image.png){width="5.8in" fig-alt="Screenshot of the RStudio interface"}
+    """
+
+    image_pattern = re.compile(
+        r"^!\[([^\]]*)\]\(([^)]+)\)(\{[^}]*\})?\s*$"
+    )
+    alt_pattern = re.compile(
+        r"^\s*Alt\s+text\s*:\s*(.+?)\s*$",
+        re.IGNORECASE,
+    )
+
+    lines = content.splitlines()
+    new_lines = []
+    i = 0
+
+    def clean_alt_text(value: str) -> str:
+        value = re.sub(r"\s+", " ", value.strip())
+        value = value.replace("\\", "\\\\").replace('"', '\\"')
+        return value
+
+    def add_fig_alt(attributes: str, alt_text: str) -> str:
+        alt_attr = f'fig-alt="{alt_text}"'
+
+        if attributes and attributes.startswith("{") and attributes.endswith("}"):
+            inner = attributes[1:-1].strip()
+
+            # Avoid duplicate fig-alt if already present.
+            if re.search(r"\bfig-alt\s*=", inner):
+                return attributes
+
+            if inner:
+                return "{" + inner + " " + alt_attr + "}"
+            return "{" + alt_attr + "}"
+
+        return "{" + alt_attr + "}"
+
+    while i < len(lines):
+        line = lines[i]
+        image_match = image_pattern.match(line.strip())
+
+        if not image_match:
+            new_lines.append(line)
+            i += 1
+            continue
+
+        existing_alt = image_match.group(1).strip()
+        image_path = image_match.group(2).strip()
+        attributes = image_match.group(3) or ""
+
+        j = i + 1
+        blank_lines = []
+
+        while j < len(lines) and not lines[j].strip():
+            blank_lines.append(lines[j])
+            j += 1
+
+        alt_match = alt_pattern.match(lines[j]) if j < len(lines) else None
+
+        if alt_match:
+            alt_text = clean_alt_text(existing_alt or alt_match.group(1))
+            new_attributes = add_fig_alt(attributes, alt_text)
+
+            # Keep square brackets empty so Quarto does not make a visible caption.
+            new_lines.append(f"![]({image_path}){new_attributes}")
+
+            if blank_lines:
+                new_lines.append("")
+
+            i = j + 1
+            continue
+
+        new_lines.append(line)
+        i += 1
+
+    return "\n".join(new_lines)
 
 
 def copy_site_resources(course_dir: Path):
@@ -966,7 +1152,7 @@ def parse_images(content: str, qmd_path: Path, course_dir: Path) -> tuple[str, i
 
             i += 1
 
-        visible_caption = caption or alt
+        visible_caption = caption or ""
         image_line = f"![{visible_caption}]({path})"
 
         attributes = []
@@ -1139,6 +1325,15 @@ def insert_markdown_into_qmd(md_path: Path, qmd_path: Path, course_dir: Path):
     with open(md_path, "r") as f:
         imported_content = f.read()
 
+    imported_content = copy_imported_media_and_rewrite_paths(
+        imported_content,
+        md_path,
+        qmd_path,
+        course_dir,
+    )
+
+    imported_content = apply_following_alt_text_to_images(imported_content)
+
     imported_content = parse_interactions(imported_content, qmd_path, course_dir).strip()
 
     imported_content = re.sub(r"^\s*#\s+[^\n]*\n*", "", imported_content, count=1)
@@ -1206,11 +1401,11 @@ def run_import(config_path: str):
         course_id = config.module.id.lower()
         click.echo(f"Importing Word content for course: {course_id}")
 
-        import_dir = Path("imports") / course_id
+        import_dir = Path("imports") / "courses" / course_id
         md_dir = import_dir / "md"
         md_dir.mkdir(parents=True, exist_ok=True)
 
-        course_dir = Path("course") / course_id
+        course_dir = Path("build") / "courses" / course_id
         if not course_dir.exists():
             parent = course_dir.parent
             options = [d for d in parent.iterdir() if d.is_dir() and d.name.startswith(course_id)] if parent.exists() else []
@@ -1245,8 +1440,15 @@ def run_import(config_path: str):
             md_path = md_dir / docx_path.with_suffix(".md").name
 
             click.echo(f"Converting {docx_path.name} to Markdown for page {page.id}")
-            convert_docx_to_md(docx_path, md_path)
+            media_dir = convert_docx_to_md(docx_path, md_path)
             click.echo(f"  Saved to {md_path}")
+            if media_dir.exists():
+                media_count = len([
+                    p for p in media_dir.rglob("*")
+                    if p.is_file() and p.suffix.lower() in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"]
+                ])
+                if media_count:
+                    click.echo(f"  Extracted {media_count} embedded media file(s) to {media_dir}")
 
             with open(md_path, "r") as f:
                 raw_md = f.read()

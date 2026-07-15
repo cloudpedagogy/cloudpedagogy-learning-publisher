@@ -1,0 +1,402 @@
+---
+title: "Visualising Results"
+id: "OUTBREAK_VE_DEMO-se02-sec01-sp01"
+section_id: "OUTBREAK_VE_DEMO-se02-sec01"
+session_id: "OUTBREAK_VE_DEMO-se02"
+toc: True
+---
+
+
+
+
+
+
+
+
+
+
+
+<!-- IMPORT_START -->
+
+**Introduction**
+
+In statistical analysis, visualisation is often the first step in understanding a dataset. Before calculating summary measures or performing formal statistical tests, researchers need to explore the characteristics of the data they have collected.
+
+In this lesson, we will use the Pima Indians Diabetes dataset (diabetes.csv) to explore key concepts in data description and visualisation. Throughout the lesson, you will learn how to identify variable types, select appropriate visualisations, describe distributions, distinguish between empirical and theoretical distributions, and calculate appropriate summary measures.
+
+Unlike traditional statistics practicals, this lesson combines theory and practice. You will be able to execute R code directly within the learning materials using WebR, allowing you to explore real health data as you progress through the topic.
+
+# ILO 1: Why Do We Visualise Data?
+
+Statistical analysis is a process.
+
+Research Question → Data Collection → Data Visualisation → Summary Measures → Statistical Analysis → Interpretation
+
+Before conducting formal analysis, we need to understand the characteristics of the data.
+
+Visualisation helps us:
+
+- Identify typical values.
+
+- Assess variation between individuals.
+
+- Detect unusual observations.
+
+- Understand distribution shape.
+
+- Guide selection of appropriate summary measures.
+
+- Assess assumptions required for later statistical analyses.
+
+Two datasets may have identical means and standard deviations but very different distributions. Visualisation helps reveal these differences.
+
+#
+
+# Activity: Exploring the Dataset
+
+Interactive R Code
+
+```{webr-r}
+diabetes <- read.csv( "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" )
+head(diabetes)
+```
+
+Questions:
+
+- How many variables are included?
+
+- Which variables appear to represent health measurements?
+
+- Which variable appears to indicate diabetes status?
+
+# ILO 2: Variable Types and Choosing Appropriate Visualisations
+
+Different variable types require different visualisations.
+
+  ---------------------------------------------------------------
+  **Variable Type**   **Example**     **Typical Visualisation**
+  ------------------- --------------- ---------------------------
+  Binary              Outcome         Bar Chart
+
+  Nominal             Blood Group     Bar Chart
+
+  Ordinal             Pain Severity   Ordered Bar Chart
+
+  Continuous          Glucose         Histogram
+
+  Count               Pregnancies     Histogram or Bar Chart
+  ---------------------------------------------------------------
+
+# Activity: Classifying Variables
+
+Examine the variables below and classify them.
+
+  -------------------------
+  **Variable**   **Type**
+  -------------- ----------
+  Outcome        ?
+
+  Glucose        ?
+
+  BMI            ?
+
+  Pregnancies    ?
+
+  Age            ?
+  -------------------------
+
+# Visualising a Binary Variable
+
+Interactive R Code
+
+```{webr-r}
+diabetes <- read.csv( "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" )
+barplot(
+table(diabetes$Outcome),
+main = "Diabetes Outcome Counts",
+xlab = "Outcome",
+ylab = "Frequency"
+)
+```
+
+Questions:
+
+- Why is a bar chart appropriate here?
+
+- Why would a histogram be inappropriate?
+
+# Visualising a Continuous Variable
+
+Interactive R Code
+
+```{webr-r}
+diabetes <- read.csv( "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" )
+hist(
+diabetes$Glucose,
+main = "Distribution of Glucose",
+xlab = "Glucose"
+)
+```
+
+Questions:
+
+- Why is a histogram appropriate?
+
+- What information does the histogram provide that a table cannot?
+
+# ILO 3: Characterising Distributions
+
+When describing a distribution, we focus on three characteristics:
+
+1.  Centre
+
+2.  Spread
+
+3.  Shape
+
+We also look for unusual observations.
+
+**Centre**
+
+The centre describes the typical value of a distribution.
+
+Questions:
+
+- Where do most glucose values appear to lie?
+
+- Does the centre appear close to 100, 120, or 150?
+
+**Spread**
+
+Spread describes variability.
+
+Questions:
+
+- Are observations tightly clustered?
+
+- Are observations widely dispersed?
+
+**Shape**
+
+Distributions may be:
+
+- Symmetric
+
+- Right-skewed
+
+- Left-skewed
+
+# Activity: Comparing Distributions
+
+Interactive R Code
+
+```{webr-r}
+diabetes <- read.csv( "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" )
+hist(
+diabetes$BMI,
+main = "Distribution of BMI",
+xlab = "BMI"
+)
+```
+
+Questions:
+
+- Is the distribution symmetric or skewed?
+
+- Are there potential outliers?
+
+- How would you describe the centre and spread?
+
+# Comparing Groups
+
+Interactive R Code
+
+```{webr-r}
+diabetes <- read.csv( "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" )
+boxplot(
+Glucose ~ Outcome,
+data = diabetes,
+main = "Glucose by Diabetes Outcome"
+)
+```
+
+Questions:
+
+- Which group has the higher median glucose value?
+
+- Are there outliers?
+
+- Is there overlap between groups?
+
+# ILO 4: Empirical and Theoretical Distributions
+
+The histogram you have seen is an empirical distribution.
+
+An empirical distribution represents observed data collected from a sample.
+
+A theoretical distribution is a mathematical model that approximates the observed data.
+
+One of the most important theoretical distributions is the Normal distribution.
+
+# Activity: Comparing an Empirical Distribution with a Theoretical Distribution
+
+Interactive R Code
+
+```{webr-r}
+diabetes <- read.csv( "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" )
+hist(
+diabetes$Glucose,
+probability = TRUE,
+main = "Glucose Distribution",
+xlab = "Glucose"
+)
+curve(
+dnorm(
+x,
+mean(diabetes$Glucose),
+sd(diabetes$Glucose)
+),
+add = TRUE,
+lwd = 2
+)
+```
+
+Questions:
+
+- Which part represents the observed data?
+
+- Which part represents the mathematical model?
+
+- Does the Normal curve fit the observed data well?
+
+# ILO 5: Choosing Appropriate Summary Measures
+
+Different variables require different summary measures.
+
+Categorical variables:
+
+- Frequencies
+
+- Percentages
+
+- Proportions
+
+Continuous variables:
+
+- Mean
+
+- Median
+
+- Standard Deviation
+
+- Interquartile Range
+
+The choice depends on the distribution.
+
+  --------------------------------------------
+  **Distribution**   **Recommended Summary**
+  ------------------ -------------------------
+  Symmetric          Mean + SD
+
+  Skewed             Median + IQR
+  --------------------------------------------
+
+# Activity: Calculating Summary Measures
+
+Interactive R Code
+
+```{webr-r}
+diabetes <- read.csv( "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv" )
+mean(diabetes$Glucose)
+median(diabetes$Glucose)
+sd(diabetes$Glucose)
+IQR(diabetes$Glucose)
+```
+
+Questions:
+
+- Is the mean higher than the median?
+
+- What does this suggest about the distribution?
+
+- Which summary measures would you report?
+
+# Integrative Activity
+
+You have been asked to explore a health dataset before formal statistical analysis.
+
+Task A
+
+Classify the following variables:
+
+- Outcome
+
+- Glucose
+
+- BMI
+
+- Pregnancies
+
+Task B
+
+Choose an appropriate visualisation for each variable.
+
+Task C
+
+Generate the visualisation using R.
+
+Task D
+
+Describe:
+
+- Centre
+
+- Spread
+
+- Shape
+
+- Outliers
+
+Task E
+
+Calculate appropriate summary measures.
+
+Task F
+
+Decide whether a theoretical Normal distribution appears to provide a reasonable approximation for the observed data.
+
+# Conclusion
+
+Visualisation is an essential first step in statistical analysis. It helps researchers understand the characteristics of their data, identify unusual observations, choose appropriate summary measures, and assess whether theoretical models provide useful approximations of observed patterns.
+
+Using the Pima Indians Diabetes dataset, we have explored variable types, graphical displays, distributions, summary measures, and theoretical models. These concepts form the foundation for later statistical inference and modelling.
+
+<!-- IMPORT_END -->
+<!-- Standard workflow: content imported from Word -->
+<!-- Advanced users may edit directly -->
+
+<!-- START_NAVIGATION -->
+
+
+```{=html}
+<div class="custom-page-navigation">
+    <div class="nav-prev">
+        
+        <a href="index.qmd">
+            <span class="nav-label">← Previous</span>
+            <span class="nav-title">Visualising Results</span>
+        </a>
+        
+    </div>
+    <div class="nav-next">
+        
+        <a href="../02-interpreting-evidence/index.qmd">
+            <span class="nav-label">Next →</span>
+            <span class="nav-title">Interpreting Evidence</span>
+        </a>
+        
+    </div>
+</div>
+```
+
+<!-- END_NAVIGATION -->

@@ -1,0 +1,50 @@
+---
+title: "Foundations of Outbreak Investigation"
+id: "OUTBREAK_VE_DEMO-se01"
+toc: True
+---
+
+This session introduces outbreak investigation, vaccination status, and vaccine effectiveness.
+
+### Learning Objectives
+<br>
+
+- Explain why vaccine effectiveness matters in outbreak investigations.
+
+
+- Interpret outbreak data by vaccination status.
+
+
+- Calculate vaccine effectiveness using relative risk.
+
+
+
+<br>
+
+<br>
+
+<!-- START_NAVIGATION -->
+
+
+```{=html}
+<div class="custom-page-navigation">
+    <div class="nav-prev">
+        
+        <a href="../index.qmd">
+            <span class="nav-label">← Previous</span>
+            <span class="nav-title">Outbreak Investigation and Vaccine Effectiveness</span>
+        </a>
+        
+    </div>
+    <div class="nav-next">
+        
+        <a href="01-outbreak-context/index.qmd">
+            <span class="nav-label">Next →</span>
+            <span class="nav-title">Outbreak Context</span>
+        </a>
+        
+    </div>
+</div>
+```
+
+<!-- END_NAVIGATION -->

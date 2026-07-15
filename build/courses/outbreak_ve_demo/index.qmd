@@ -1,0 +1,36 @@
+---
+title: "Outbreak Investigation and Vaccine Effectiveness"
+subtitle: "PH_DEMO_01"
+id: "OUTBREAK_VE_DEMO"
+toc: True
+---
+
+Demonstration course showing Word-first structured publishing with public health content.
+
+## Sessions
+
+
+- [SE01: Foundations of Outbreak Investigation](se01/index.qmd) 
+
+- [SE02: Interpretation and Communication](se02/index.qmd)
+
+<!-- START_NAVIGATION -->
+
+
+```{=html}
+<div class="custom-page-navigation">
+    <div class="nav-prev">
+        
+    </div>
+    <div class="nav-next">
+        
+        <a href="se01/index.qmd">
+            <span class="nav-label">Next →</span>
+            <span class="nav-title">Foundations of Outbreak Investigation</span>
+        </a>
+        
+    </div>
+</div>
+```
+
+<!-- END_NAVIGATION -->

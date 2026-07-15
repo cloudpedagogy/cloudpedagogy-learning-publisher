@@ -1,0 +1,41 @@
+---
+title: "Section 3: Reporting and Action"
+id: "OUTBREAK_VE_DEMO-se02-sec03"
+section_id: "OUTBREAK_VE_DEMO-se02-sec03"
+session_id: "OUTBREAK_VE_DEMO-se02"
+toc: True
+---
+
+
+
+
+### In this section
+<br>
+
+- [Reporting and Action](OUTBREAK_VE_DEMO-se02-sec03-sp01.qmd)
+
+<!-- START_NAVIGATION -->
+
+
+```{=html}
+<div class="custom-page-navigation">
+    <div class="nav-prev">
+        
+        <a href="../02-interpreting-evidence/OUTBREAK_VE_DEMO-se02-sec02-sp01.qmd">
+            <span class="nav-label">← Previous</span>
+            <span class="nav-title">Interpreting Evidence</span>
+        </a>
+        
+    </div>
+    <div class="nav-next">
+        
+        <a href="OUTBREAK_VE_DEMO-se02-sec03-sp01.qmd">
+            <span class="nav-label">Next →</span>
+            <span class="nav-title">Reporting and Action</span>
+        </a>
+        
+    </div>
+</div>
+```
+
+<!-- END_NAVIGATION -->
