@@ -4,6 +4,15 @@ CloudPedagogy Learning Publisher is a Word-first publishing system for creating 
 
 The system layers a structured publishing workflow on top of Quarto. Authors do not need to write Quarto Markdown directly for routine course development.
 
+
+## Live demo
+
+[Explore the Outbreak Investigation and Vaccine Effectiveness demo](https://cloudpedagogy-learning-publisher.s3.eu-west-2.amazonaws.com/outbreak_ve_demo/se01/OUTBREAK_VE_DEMO-se01-sec01-sp01.html)
+
+This demonstration highlights one part of the Learning Publisher ecosystem: transforming structured Word content into an interactive Quarto learning page. It includes course navigation, rich content, self-checks, reveal activities, tabs, a quiz, interactive R with WebR and an embedded Plotly visualisation.
+
+Additional demonstrations and publishing applications will be added as the ecosystem develops.
+
 ## What it produces
 
 Depending on the workflow and configuration, the project supports:
