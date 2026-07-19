@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 import click
 import re
+import html
+import yaml
 from urllib.parse import urlparse, parse_qs
 from ..core.config_loader import ConfigLoader
 
@@ -14,6 +16,169 @@ IMPORT_END = "<!-- IMPORT_END -->"
 def check_pandoc():
     """Check if pandoc is installed and available in PATH."""
     return shutil.which("pandoc") is not None
+
+
+def contains_webr_directive(content: str) -> bool:
+    """Return True when imported Markdown requests browser-based WebR."""
+    normalized = re.sub(r"\\\s*\n", "\n", content)
+    return re.search(
+        r"^\s*R Mode\s*::\s*webr\s*$",
+        normalized,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+
+
+def contains_html_embed_directive(content: str) -> bool:
+    """Return True when imported Markdown contains a local HTML Embed block."""
+    normalized = re.sub(r"\\\s*\n", "\n", content)
+    return re.search(
+        r"^\s*(?:#+\s*)?HTML Embed\s*::\s*.+$",
+        normalized,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+
+
+def is_webr_extension_installed(course_dir: Path) -> bool:
+    """Detect an installed WebR extension without assuming one folder layout."""
+    extensions_dir = course_dir / "_extensions"
+    if not extensions_dir.exists():
+        return False
+
+    for marker in extensions_dir.rglob("_extension.yml"):
+        if marker.parent.name.lower() == "webr":
+            return True
+        try:
+            extension_data = yaml.safe_load(marker.read_text(encoding="utf-8")) or {}
+            if str(extension_data.get("title", "")).strip().lower() == "webr":
+                return True
+            if str(extension_data.get("name", "")).strip().lower() == "webr":
+                return True
+        except (OSError, yaml.YAMLError):
+            continue
+
+    return False
+
+
+def install_webr_extension(course_dir: Path):
+    """Install the trusted WebR extension non-interactively when required."""
+    if is_webr_extension_installed(course_dir):
+        click.echo("WebR extension already installed")
+        return
+
+    if shutil.which("quarto") is None:
+        raise RuntimeError(
+            "WebR content was detected, but Quarto is not available in PATH. "
+            "Install Quarto and rerun import-word."
+        )
+
+    click.echo("Installing trusted WebR extension (coatless/quarto-webr)...")
+    result = subprocess.run(
+        ["quarto", "add", "coatless/quarto-webr", "--no-prompt"],
+        cwd=course_dir,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        details = (result.stderr or result.stdout or "Unknown Quarto error").strip()
+        raise RuntimeError(f"WebR extension installation failed: {details}")
+
+    if not is_webr_extension_installed(course_dir):
+        raise RuntimeError(
+            "Quarto reported success, but the WebR extension could not be found "
+            f"under {course_dir / '_extensions'}."
+        )
+
+    click.echo("WebR extension installed")
+
+
+def ensure_webr_filter(course_dir: Path):
+    """Ensure the generated Quarto project enables the WebR filter."""
+    quarto_config = course_dir / "_quarto.yml"
+    if not quarto_config.exists():
+        raise FileNotFoundError(f"Generated Quarto configuration not found: {quarto_config}")
+
+    try:
+        config_data = yaml.safe_load(quarto_config.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise RuntimeError(f"Unable to read {quarto_config}: {exc}") from exc
+
+    filters = config_data.get("filters")
+    if filters is None:
+        config_data["filters"] = ["webr"]
+    elif isinstance(filters, str):
+        if filters == "webr":
+            click.echo("WebR filter already enabled in _quarto.yml")
+            return
+        config_data["filters"] = [filters, "webr"]
+    elif isinstance(filters, list):
+        if "webr" in filters:
+            click.echo("WebR filter already enabled in _quarto.yml")
+            return
+        filters.append("webr")
+    else:
+        raise RuntimeError(
+            f"Unsupported filters structure in {quarto_config}; expected a string or list."
+        )
+
+    quarto_config.write_text(
+        yaml.safe_dump(config_data, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    click.echo("WebR filter enabled in _quarto.yml")
+
+
+def ensure_webr_support(course_dir: Path):
+    """Install and configure WebR for a generated course project."""
+    install_webr_extension(course_dir)
+    ensure_webr_filter(course_dir)
+
+
+def ensure_html_resources(course_dir: Path):
+    """Ensure Quarto copies local HTML activities into rendered output."""
+    quarto_config = course_dir / "_quarto.yml"
+    if not quarto_config.exists():
+        raise FileNotFoundError(f"Generated Quarto configuration not found: {quarto_config}")
+
+    try:
+        config_data = yaml.safe_load(quarto_config.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise RuntimeError(f"Unable to read {quarto_config}: {exc}") from exc
+
+    project = config_data.get("project")
+    if project is None:
+        project = {}
+        config_data["project"] = project
+    if not isinstance(project, dict):
+        raise RuntimeError(
+            f"Unsupported project structure in {quarto_config}; expected a mapping."
+        )
+
+    required_resource = "resources/**"
+    resources = project.get("resources")
+    if resources is None:
+        project["resources"] = [required_resource]
+    elif isinstance(resources, str):
+        if resources == required_resource:
+            click.echo("HTML resources already enabled in _quarto.yml")
+            return
+        project["resources"] = [resources, required_resource]
+    elif isinstance(resources, list):
+        if required_resource in resources:
+            click.echo("HTML resources already enabled in _quarto.yml")
+            return
+        resources.append(required_resource)
+    else:
+        raise RuntimeError(
+            f"Unsupported project.resources structure in {quarto_config}; "
+            "expected a string or list."
+        )
+
+    quarto_config.write_text(
+        yaml.safe_dump(config_data, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    click.echo("HTML resources enabled in _quarto.yml")
 
 
 def convert_docx_to_md(docx_path: Path, md_path: Path) -> Path:
@@ -62,9 +227,12 @@ def normalize_metadata_blocks(content: str) -> str:
 
     directive_prefixes = [
         "Callout ::",
+        "Title ::",
         "Text ::",
         "Reveal",
+        "END Reveal",
         "SelfCheck",
+        "END SelfCheck",
         "Question ::",
         "Answer ::",
         "Option ::",
@@ -79,17 +247,28 @@ def normalize_metadata_blocks(content: str) -> str:
         "Alt ::",
         "Caption ::",
         "Tabs",
+        "END Tabs",
+        "Tab ::",
+        "END Tab",
         "Interpretation ::",
         "Assumptions ::",
         "Limitations ::",
         "Image ::",
+        "END Image",
         "Width ::",
         "File ::",
+        "END File",
         "Display ::",
         "Label ::",
         "Quiz",
+        "END Quiz",
+        "END Callout",
         "YouTubeEmbed ::",
         "PanoptoEmbed ::",
+        "HTML Embed ::",
+        "END HTML Embed",
+        "Height ::",
+        "Fallback Image ::",
     ]
 
     # Convert Pandoc hard-line-break markers into actual line breaks.
@@ -395,14 +574,23 @@ def is_interaction_header(line: str) -> bool:
             r"^(?:#+\s*)?R Example\s*$",
             r"^(?:#+\s*)?END R Example\s*$",
             r"^(?:#+\s*)?Tabs\s*$",
+            r"^(?:#+\s*)?END Tabs\s*$",
             r"^(?:#+\s*)?Reveal\s*$",
+            r"^(?:#+\s*)?END Reveal\s*$",
             r"^(?:#+\s*)?Quiz\s*$",
+            r"^(?:#+\s*)?END Quiz\s*$",
             r"^(?:#+\s*)?SelfCheck\s*$",
+            r"^(?:#+\s*)?END SelfCheck\s*$",
             r"^(?:#+\s*)?Callout\s*::",
+            r"^(?:#+\s*)?END Callout\s*$",
             r"^(?:#+\s*)?Image\s*::",
+            r"^(?:#+\s*)?END Image\s*$",
             r"^(?:#+\s*)?File\s*::",
+            r"^(?:#+\s*)?END File\s*$",
             r"^(?:#+\s*)?YouTubeEmbed\s*::",
             r"^(?:#+\s*)?PanoptoEmbed\s*::",
+            r"^(?:#+\s*)?HTML Embed\s*::",
+            r"^(?:#+\s*)?END HTML Embed\s*$",
         ]
     )
 
@@ -472,6 +660,19 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
     quiz_has_question = False
     quiz_option_count = 0
     quiz_has_answer = False
+    bounded_blocks = {
+        "callout": "Callout",
+        "reveal": "Reveal",
+        "selfcheck": "SelfCheck",
+        "tabs": "Tabs",
+        "quiz": "Quiz",
+        "r code": "R Code",
+        "r example": "R Example",
+        "image": "Image",
+        "file": "File",
+        "html embed": "HTML Embed",
+    }
+    block_stack = []
 
     for idx, raw_line in enumerate(lines, start=1):
         line = raw_line.strip()
@@ -479,8 +680,37 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
         if not line:
             continue
 
+        end_match = re.match(
+            r"^(?:#+\s*)?END\s+(Callout|Reveal|SelfCheck|Tabs|Quiz|R Code|R Example|Image|File|HTML Embed)\s*$",
+            line,
+            re.IGNORECASE,
+        )
+        if end_match:
+            end_name = end_match.group(1).lower()
+            if not block_stack:
+                warnings.append(f"{page_id} line {idx}: END {end_match.group(1)} has no matching opening tag")
+            elif block_stack[-1][0] != end_name:
+                expected = bounded_blocks[block_stack[-1][0]]
+                warnings.append(
+                    f"{page_id} line {idx}: END {end_match.group(1)} does not match open {expected} "
+                    f"block from line {block_stack[-1][1]}"
+                )
+            else:
+                block_stack.pop()
+            continue
+
+        opener_match = re.match(
+            r"^(?:#+\s*)?(Callout\s*::\s*.+|Reveal|SelfCheck|Tabs|Quiz|R Code|R Example|Image\s*::\s*.+|File\s*::\s*.+|HTML Embed\s*::\s*.+)\s*$",
+            line,
+            re.IGNORECASE,
+        )
+        if opener_match:
+            opener = opener_match.group(1)
+            name = re.split(r"\s*::", opener, maxsplit=1)[0].strip().lower()
+            block_stack.append((name, idx))
+
         malformed_match = re.match(
-            r"^(YouTubeEmbed|PanoptoEmbed|Image|File|Callout|Question|Option|Answer|Caption|Alt|Width|Display|Label|R Mode|Echo|Output)\s*:\s+\S+",
+            r"^(YouTubeEmbed|PanoptoEmbed|HTML Embed|Image|File|Callout|Title|Question|Option|Answer|Caption|Alt|Width|Height|Fallback Image|Display|Label|R Mode|Echo|Output)\s*:\s+\S+",
             line,
             re.IGNORECASE,
         )
@@ -569,6 +799,52 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
             if raw_path.startswith("resources/") and not (project_root / raw_path).exists():
                 warnings.append(f"{page_id} line {idx}: file path not found: {raw_path}")
 
+        html_match = re.match(
+            r"^(?:#+\s*)?HTML Embed\s*::\s*(.+)$",
+            line,
+            re.IGNORECASE,
+        )
+        if html_match:
+            raw_path = html_match.group(1).strip().replace("\\", "/")
+            path_parts = Path(raw_path).parts
+            if (
+                not raw_path.startswith("resources/html/")
+                or Path(raw_path).suffix.lower() not in {".html", ".htm"}
+                or ".." in path_parts
+                or Path(raw_path).is_absolute()
+            ):
+                warnings.append(
+                    f"{page_id} line {idx}: HTML Embed must reference a local "
+                    "resources/html/*.html file"
+                )
+            elif not (project_root / raw_path).is_file():
+                warnings.append(
+                    f"{page_id} line {idx}: HTML Embed source not found: {raw_path}"
+                )
+
+        height_match = re.match(r"^Height\s*::\s*(.+)$", line, re.IGNORECASE)
+        if height_match:
+            height_value = height_match.group(1).strip()
+            if not height_value.isdigit() or not 300 <= int(height_value) <= 2000:
+                warnings.append(
+                    f"{page_id} line {idx}: Height must be a whole number "
+                    "between 300 and 2000"
+                )
+
+        fallback_match = re.match(
+            r"^Fallback Image\s*::\s*(.+)$",
+            line,
+            re.IGNORECASE,
+        )
+        if fallback_match:
+            fallback_path = fallback_match.group(1).strip().replace("\\", "/")
+            if fallback_path.startswith("resources/") and not (
+                project_root / fallback_path
+            ).is_file():
+                warnings.append(
+                    f"{page_id} line {idx}: fallback image not found: {fallback_path}"
+                )
+
     if quiz_open:
         if not quiz_has_question:
             warnings.append(f"{page_id} line {quiz_start_line}: Quiz block missing Question ::")
@@ -576,6 +852,12 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
             warnings.append(f"{page_id} line {quiz_start_line}: Quiz block has fewer than 2 Option :: lines")
         if not quiz_has_answer:
             warnings.append(f"{page_id} line {quiz_start_line}: Quiz block missing Answer ::")
+
+    for name, start_line in block_stack:
+        warnings.append(
+            f"{page_id} line {start_line}: {bounded_blocks[name]} block has no explicit "
+            f"END {bounded_blocks[name]} tag"
+        )
 
     return warnings
 
@@ -801,68 +1083,229 @@ def parse_r_code(content: str) -> tuple[str, int]:
     return "\n".join(new_lines), count
 
 def parse_tabs(content: str) -> tuple[str, int]:
-    """Detect and render localized Tab interactions (Quarto tabset)."""
+    """
+    Render flexible tab interactions as Quarto panel tabsets.
+
+    Required syntax:
+
+    Tabs
+
+    Tab :: First tab
+
+    Any ordinary Markdown content can appear here.
+
+    END Tab
+
+    Tab :: Second tab
+
+    Additional content can appear here.
+
+    END Tab
+
+    END Tabs
+
+    Each tab can contain paragraphs, lists, links, tables, equations
+    and ordinary Markdown produced by Pandoc.
+
+    Interaction metadata blocks should not be nested inside tabs.
+    """
     lines = content.split("\n")
     new_lines = []
     count = 0
+    i = 0
 
-    in_tabs = False
-    current_tab_title = None
-    tab_content_lines = []
+    while i < len(lines):
+        current_text = lines[i].strip()
 
-    def flush_tab():
-        if current_tab_title:
-            new_lines.append(f"## {current_tab_title}")
-            new_lines.append("\n".join(tab_content_lines).strip())
+        # Copy ordinary content until a Tabs block is found.
+        if not re.match(
+            r"^(?:#+\s*)?Tabs\s*$",
+            current_text,
+            re.IGNORECASE,
+        ):
+            new_lines.append(lines[i])
+            i += 1
+            continue
+
+        count += 1
+        i += 1
+
+        tabs = []
+        current_tab_title = None
+        current_tab_lines = []
+        found_tabs_end = False
+
+        while i < len(lines):
+            current_line = lines[i]
+            current_text = current_line.strip()
+
+            # Close the complete Tabs block.
+            if re.match(
+                r"^(?:#+\s*)?END Tabs\s*$",
+                current_text,
+                re.IGNORECASE,
+            ):
+                if current_tab_title is not None:
+                    tabs.append(
+                        (
+                            current_tab_title,
+                            current_tab_lines,
+                        )
+                    )
+
+                current_tab_title = None
+                current_tab_lines = []
+                found_tabs_end = True
+                i += 1
+                break
+
+            # Start a new tab.
+            tab_match = re.match(
+                r"^(?:#+\s*)?Tab\s*::\s*(.+?)\s*$",
+                current_text,
+                re.IGNORECASE,
+            )
+
+            if tab_match:
+                # If the previous tab did not have END Tab, preserve it
+                # but issue a warning.
+                if current_tab_title is not None:
+                    tabs.append(
+                        (
+                            current_tab_title,
+                            current_tab_lines,
+                        )
+                    )
+
+                    click.echo(
+                        click.style(
+                            f"Warning: Tab '{current_tab_title}' has no "
+                            "END Tab tag; it was closed by the next Tab.",
+                            fg="yellow",
+                        )
+                    )
+
+                current_tab_title = tab_match.group(1).strip()
+                current_tab_lines = []
+                i += 1
+                continue
+
+            # Close the current individual tab.
+            if re.match(
+                r"^(?:#+\s*)?END Tab\s*$",
+                current_text,
+                re.IGNORECASE,
+            ):
+                if current_tab_title is None:
+                    click.echo(
+                        click.style(
+                            "Warning: END Tab found without a matching "
+                            "Tab :: opening tag.",
+                            fg="yellow",
+                        )
+                    )
+                else:
+                    tabs.append(
+                        (
+                            current_tab_title,
+                            current_tab_lines,
+                        )
+                    )
+                    current_tab_title = None
+                    current_tab_lines = []
+
+                i += 1
+                continue
+
+            # Preserve all ordinary content inside the current tab,
+            # including blank lines.
+            if current_tab_title is not None:
+                current_tab_lines.append(current_line)
+            elif current_text:
+                click.echo(
+                    click.style(
+                        "Warning: Content found inside Tabs but outside "
+                        "a Tab :: block; the content was ignored.",
+                        fg="yellow",
+                    )
+                )
+
+            i += 1
+
+        # Handle a Tabs block that reaches the end of the document.
+        if not found_tabs_end:
+            if current_tab_title is not None:
+                tabs.append(
+                    (
+                        current_tab_title,
+                        current_tab_lines,
+                    )
+                )
+
+            click.echo(
+                click.style(
+                    "Warning: Tabs block has no END Tabs tag; "
+                    "content continued to the end of the document.",
+                    fg="yellow",
+                )
+            )
+
+        # Generate the Quarto panel tabset.
+        new_lines.append("::: {.panel-tabset}")
+        new_lines.append("")
+
+        for tab_title, tab_lines in tabs:
+            # Remove unnecessary blank lines around the tab content,
+            # while retaining blank lines within it.
+            tab_lines = list(tab_lines)
+
+            while tab_lines and not tab_lines[0].strip():
+                tab_lines.pop(0)
+
+            while tab_lines and not tab_lines[-1].strip():
+                tab_lines.pop()
+
+            new_lines.append(f"## {tab_title}")
             new_lines.append("")
 
-    for line in lines:
-        stripped = line.strip()
+            if tab_lines:
+                new_lines.extend(tab_lines)
+                new_lines.append("")
 
-        if not in_tabs:
-            if re.match(r"^(?:#+\s*)?Tabs\s*$", stripped, re.IGNORECASE):
-                in_tabs = True
-                new_lines.append("::: {.panel-tabset}")
-                count += 1
-                current_tab_title = None
-                tab_content_lines = []
-                continue
-            else:
-                new_lines.append(line)
-        else:
-            if is_markdown_heading(line) or (
-                is_interaction_header(line)
-                and not re.match(r"^(?:#+\s*)?Tabs\s*$", stripped, re.IGNORECASE)
-            ):
-                flush_tab()
-                new_lines.append(":::")
-                new_lines.append(line)
-                in_tabs = False
-                current_tab_title = None
-                tab_content_lines = []
-            elif "::" in stripped:
-                flush_tab()
-                current_tab_title, tab_content = stripped.split("::", 1)
-                current_tab_title = current_tab_title.strip()
-                tab_content_lines = [tab_content.strip()]
-            else:
-                if current_tab_title is not None:
-                    tab_content_lines.append(line)
-                elif stripped:
-                    tab_content_lines.append(line)
-
-    if in_tabs:
-        flush_tab()
         new_lines.append(":::")
+        new_lines.append("")
 
     if count > 0:
-        click.echo(click.style("Detected tabs interaction", fg="blue"))
-        click.echo("  Rendering as tabset")
+        click.echo(
+            click.style(
+                "Detected tabs interactions",
+                fg="blue",
+            )
+        )
+        click.echo(
+            f"  Rendering {count} flexible tabset interaction(s)"
+        )
 
     return "\n".join(new_lines), count
 
 
 def parse_callouts(content: str) -> tuple[str, int]:
+    """
+    Render Callout blocks containing rich Markdown content.
+
+    Syntax:
+
+    Callout :: important
+    Title :: Optional title
+
+    Paragraphs, lists, tables, equations, links and ordinary Markdown.
+
+    END Callout
+
+    Text :: remains accepted for concise, single-paragraph content.
+    END Callout is required so headings and other ordinary Markdown can safely
+    appear inside the callout.
+    """
     lines = content.split("\n")
     new_lines = []
     count = 0
@@ -878,28 +1321,66 @@ def parse_callouts(content: str) -> tuple[str, int]:
             continue
 
         callout_type = match.group(1).strip().lower()
-        text_lines = []
+        allowed_types = {"note", "tip", "warning", "caution", "important"}
+        if callout_type not in allowed_types:
+            click.echo(
+                click.style(
+                    f"Warning: Unknown Callout type '{callout_type}'; using 'note'.",
+                    fg="yellow",
+                )
+            )
+            callout_type = "note"
+
+        title = ""
+        content_lines = []
         i += 1
+        found_end = False
 
         while i < len(lines):
-            s = lines[i].strip()
-            if is_markdown_heading(lines[i]) or is_interaction_header(lines[i]):
+            current_line = lines[i]
+            s = current_line.strip()
+
+            if re.match(r"^(?:#+\s*)?END Callout\s*$", s, re.IGNORECASE):
+                found_end = True
+                i += 1
                 break
 
-            field_match = re.match(r"^Text\s*::\s*(.*)$", s, re.IGNORECASE)
-            if field_match:
-                text_lines.append(field_match.group(1).strip())
-            elif s:
-                text_lines.append(lines[i].strip())
+            title_match = re.match(r"^Title\s*::\s*(.*)$", s, re.IGNORECASE)
+            text_match = re.match(r"^Text\s*::\s*(.*)$", s, re.IGNORECASE)
+
+            if title_match:
+                title = title_match.group(1).strip()
+            elif text_match:
+                content_lines.append(text_match.group(1).strip())
+            else:
+                content_lines.append(current_line)
 
             i += 1
 
-        new_lines.append(f"::: {{.callout-{callout_type}}}")
-        if text_lines:
-            new_lines.append("\n".join(text_lines).strip())
+        while content_lines and not content_lines[0].strip():
+            content_lines.pop(0)
+        while content_lines and not content_lines[-1].strip():
+            content_lines.pop()
+
+        attributes = f".callout-{callout_type}"
+        if title:
+            attributes += f' title="{html.escape(title, quote=True)}"'
+
+        new_lines.append(f"::: {{{attributes}}}")
+        if content_lines:
+            new_lines.extend(content_lines)
         new_lines.append(":::")
         new_lines.append("")
         count += 1
+
+        if not found_end:
+            click.echo(
+                click.style(
+                    "Warning: Callout block has no END Callout tag; "
+                    "content continued to the end of the document.",
+                    fg="yellow",
+                )
+            )
 
     if count > 0:
         click.echo(click.style("Detected callouts", fg="blue"))
@@ -909,6 +1390,22 @@ def parse_callouts(content: str) -> tuple[str, int]:
 
 
 def parse_selfcheck(content: str) -> tuple[str, int]:
+    """
+    Render SelfCheck blocks as questions with hidden suggested answers.
+
+    Preferred syntax:
+
+    SelfCheck
+    Question :: Why might effectiveness differ?
+    Answer :: Differences in exposure...
+
+    Additional answer paragraphs, lists and equations can follow.
+
+    END SelfCheck
+
+    END SelfCheck is required so rich answer content can safely contain
+    headings and other ordinary Markdown.
+    """
     lines = content.split("\n")
     new_lines = []
     count = 0
@@ -917,52 +1414,130 @@ def parse_selfcheck(content: str) -> tuple[str, int]:
     while i < len(lines):
         stripped = lines[i].strip()
 
-        if not re.match(r"^(?:#+\s*)?SelfCheck\s*$", stripped, re.IGNORECASE):
+        if not re.match(
+            r"^(?:#+\s*)?SelfCheck\s*$",
+            stripped,
+            re.IGNORECASE,
+        ):
             new_lines.append(lines[i])
             i += 1
             continue
 
         question = ""
         answer_lines = []
+        answer_started = False
         i += 1
+        found_end = False
 
         while i < len(lines):
-            s = lines[i].strip()
-            if is_markdown_heading(lines[i]) or is_interaction_header(lines[i]):
+            current_line = lines[i]
+            current_text = current_line.strip()
+
+            # Preferred explicit ending
+            if re.match(
+                r"^(?:#+\s*)?END SelfCheck\s*$",
+                current_text,
+                re.IGNORECASE,
+            ):
+                found_end = True
+                i += 1
                 break
 
-            q_match = re.match(r"^Question\s*::\s*(.*)$", s, re.IGNORECASE)
-            a_match = re.match(r"^Answer\s*::\s*(.*)$", s, re.IGNORECASE)
+            question_match = re.match(
+                r"^Question\s*::\s*(.*)$",
+                current_text,
+                re.IGNORECASE,
+            )
+            answer_match = re.match(
+                r"^Answer\s*::\s*(.*)$",
+                current_text,
+                re.IGNORECASE,
+            )
 
-            if q_match:
-                question = q_match.group(1).strip()
-            elif a_match:
-                answer_lines.append(a_match.group(1).strip())
-            elif s:
-                answer_lines.append(lines[i].strip())
+            if question_match:
+                question = question_match.group(1).strip()
+            elif answer_match:
+                answer_started = True
+                answer_lines.append(answer_match.group(1).strip())
+            elif answer_started:
+                # Preserve ordinary content and blank lines so answers can
+                # contain multiple paragraphs, lists, tables and equations.
+                answer_lines.append(current_line)
 
             i += 1
 
-        new_lines.append("::: {.callout-tip}")
+        # Remove unnecessary blank lines around the answer while preserving
+        # blank lines within it.
+        while answer_lines and not answer_lines[0].strip():
+            answer_lines.pop(0)
+
+        while answer_lines and not answer_lines[-1].strip():
+            answer_lines.pop()
+
+        new_lines.append(
+            '::: {.callout-tip title="Self-check"}'
+        )
+
         if question:
-            new_lines.append(f"**Self-check:** {question}")
+            new_lines.append(question)
             new_lines.append("")
+
         if answer_lines:
-            new_lines.append("**Suggested answer**")
+            new_lines.append("<details>")
+            new_lines.append(
+                "<summary><strong>Show suggested answer</strong></summary>"
+            )
             new_lines.append("")
-            new_lines.append("\n".join(answer_lines).strip())
+            new_lines.extend(answer_lines)
+            new_lines.append("")
+            new_lines.append("</details>")
+
         new_lines.append(":::")
         new_lines.append("")
         count += 1
 
+        if not found_end:
+            click.echo(
+                click.style(
+                    "Warning: SelfCheck block has no END SelfCheck tag; "
+                    "content continued to the end of the document.",
+                    fg="yellow",
+                )
+            )
+
     if count > 0:
-        click.echo(click.style("Detected self-check blocks", fg="blue"))
-        click.echo(f"  Rendering {count} self-check interactions")
+        click.echo(
+            click.style(
+                "Detected self-check blocks",
+                fg="blue",
+            )
+        )
+        click.echo(
+            f"  Rendering {count} self-check interactions "
+            "with hidden answers"
+        )
 
     return "\n".join(new_lines), count
 
 
 def parse_reveal(content: str) -> tuple[str, int]:
+    """
+    Render generic Reveal blocks as collapsible content.
+
+    Syntax:
+
+    Reveal
+    Label :: Show more
+
+    Any ordinary Markdown content can appear here.
+
+    END Reveal
+
+    The content may contain paragraphs, lists, links, tables, equations
+    and Markdown produced from normal Word formatting.
+
+    Metadata interaction blocks should not be nested inside Reveal.
+    """
     lines = content.split("\n")
     new_lines = []
     count = 0
@@ -971,46 +1546,100 @@ def parse_reveal(content: str) -> tuple[str, int]:
     while i < len(lines):
         stripped = lines[i].strip()
 
-        if not re.match(r"^(?:#+\s*)?Reveal\s*$", stripped, re.IGNORECASE):
+        if not re.match(
+            r"^(?:#+\s*)?Reveal\s*$",
+            stripped,
+            re.IGNORECASE,
+        ):
             new_lines.append(lines[i])
             i += 1
             continue
 
-        step_lines = []
+        label = "Show more"
+        reveal_lines = []
         i += 1
+        found_end = False
 
         while i < len(lines):
-            s = lines[i].strip()
-            if is_markdown_heading(lines[i]) or is_interaction_header(lines[i]):
+            current_line = lines[i]
+            current_text = current_line.strip()
+
+            if re.match(
+                r"^(?:#+\s*)?END Reveal\s*$",
+                current_text,
+                re.IGNORECASE,
+            ):
+                found_end = True
+                i += 1
                 break
 
-            if s:
-                step_lines.append(lines[i].strip())
+            label_match = re.match(
+                r"^Label\s*::\s*(.*)$",
+                current_text,
+                re.IGNORECASE,
+            )
+
+            if label_match:
+                label_value = label_match.group(1).strip()
+                if label_value:
+                    label = label_value
+            else:
+                reveal_lines.append(current_line)
+
             i += 1
 
+        # Remove unnecessary blank lines around the contained content.
+        while reveal_lines and not reveal_lines[0].strip():
+            reveal_lines.pop(0)
+
+        while reveal_lines and not reveal_lines[-1].strip():
+            reveal_lines.pop()
+
         new_lines.append("<details>")
-        new_lines.append("<summary><strong>Show steps</strong></summary>")
+        new_lines.append(
+            f"<summary><strong>{html.escape(label)}</strong></summary>"
+        )
         new_lines.append("")
 
-        for step in step_lines:
-            new_lines.append(f"- {step}")
-
-        if step_lines:
+        if reveal_lines:
+            new_lines.extend(reveal_lines)
             new_lines.append("")
 
         new_lines.append("</details>")
         new_lines.append("")
         count += 1
 
+        if not found_end:
+            click.echo(
+                click.style(
+                    "Warning: Reveal block has no END Reveal tag; "
+                    "content continued to the end of the document.",
+                    fg="yellow",
+                )
+            )
+
     if count > 0:
-        click.echo(click.style("Detected reveal blocks", fg="blue"))
-        click.echo(f"  Rendering {count} reveal interactions")
+        click.echo(
+            click.style(
+                "Detected reveal blocks",
+                fg="blue",
+            )
+        )
+        click.echo(
+            f"  Rendering {count} generic reveal interactions"
+        )
 
     return "\n".join(new_lines), count
 
 
 def parse_quiz(content: str) -> tuple[str, int]:
-    """Parse Word-authored Quiz blocks into a static formative quiz UI."""
+    """
+    Render Quiz blocks with a rich, expandable explanation.
+
+    Question ::, Option :: and Answer :: remain single-paragraph properties.
+    Explanation :: begins rich explanation content; subsequent paragraphs,
+    lists, tables and equations are preserved until END Quiz.
+    """
     lines = content.split("\n")
     new_lines = []
     count = 0
@@ -1037,14 +1666,19 @@ def parse_quiz(content: str) -> tuple[str, int]:
         options = []
         answer = ""
         explanation_lines = []
+        explanation_started = False
         i += 1
         quiz_index += 1
         quiz_name = f"quiz_{quiz_index}"
+        found_end = False
 
         while i < len(lines):
-            s = lines[i].strip()
+            current_line = lines[i]
+            s = current_line.strip()
 
-            if is_markdown_heading(lines[i]) or is_interaction_header(lines[i]):
+            if re.match(r"^(?:#+\s*)?END Quiz\s*$", s, re.IGNORECASE):
+                found_end = True
+                i += 1
                 break
 
             q_match = re.match(r"^Question\s*::\s*(.*)$", s, re.IGNORECASE)
@@ -1059,9 +1693,10 @@ def parse_quiz(content: str) -> tuple[str, int]:
             elif a_match:
                 answer = a_match.group(1).strip()
             elif e_match:
+                explanation_started = True
                 explanation_lines.append(e_match.group(1).strip())
-            elif s:
-                explanation_lines.append(lines[i].strip())
+            elif explanation_started:
+                explanation_lines.append(current_line)
 
             i += 1
 
@@ -1098,12 +1733,25 @@ def parse_quiz(content: str) -> tuple[str, int]:
         if explanation_lines:
             new_lines.append("**Explanation:**")
             new_lines.append("")
-            new_lines.append("\n".join(explanation_lines).strip())
+            while explanation_lines and not explanation_lines[0].strip():
+                explanation_lines.pop(0)
+            while explanation_lines and not explanation_lines[-1].strip():
+                explanation_lines.pop()
+            new_lines.extend(explanation_lines)
             new_lines.append("")
 
         new_lines.append("</details>")
         new_lines.append("")
         count += 1
+
+        if not found_end:
+            click.echo(
+                click.style(
+                    "Warning: Quiz block has no END Quiz tag; "
+                    "content continued to the end of the document.",
+                    fg="yellow",
+                )
+            )
 
     if count > 0:
         click.echo(click.style("Detected quiz blocks", fg="blue"))
@@ -1112,7 +1760,164 @@ def parse_quiz(content: str) -> tuple[str, int]:
     return "\n".join(new_lines), count
 
 
+def parse_html_embeds(
+    content: str,
+    qmd_path: Path,
+    course_dir: Path,
+) -> tuple[str, int]:
+    """Render trusted, local, standalone HTML activities in accessible iframes."""
+    lines = content.split("\n")
+    new_lines = []
+    count = 0
+    i = 0
+
+    while i < len(lines):
+        stripped = lines[i].strip()
+        match = re.match(
+            r"^(?:#+\s*)?HTML Embed\s*::\s*(.+)$",
+            stripped,
+            re.IGNORECASE,
+        )
+
+        if not match:
+            new_lines.append(lines[i])
+            i += 1
+            continue
+
+        raw_path = match.group(1).strip().replace("\\", "/")
+        path_object = Path(raw_path)
+        if (
+            not raw_path.startswith("resources/html/")
+            or path_object.suffix.lower() not in {".html", ".htm"}
+            or ".." in path_object.parts
+            or path_object.is_absolute()
+        ):
+            raise ValueError(
+                "HTML Embed must reference a trusted local file under "
+                f"resources/html/: {raw_path}"
+            )
+        source_file = course_dir / raw_path
+        if not source_file.is_file():
+            raise FileNotFoundError(f"HTML Embed source not found: {source_file}")
+
+        title = path_object.stem.replace("_", " ").replace("-", " ").strip()
+        height = 700
+        fallback_image = ""
+        found_end = False
+        i += 1
+
+        while i < len(lines):
+            current_line = lines[i]
+            current_text = current_line.strip()
+
+            if re.match(
+                r"^(?:#+\s*)?END HTML Embed\s*$",
+                current_text,
+                re.IGNORECASE,
+            ):
+                found_end = True
+                i += 1
+                break
+
+            if is_markdown_heading(current_line) or is_interaction_header(current_line):
+                break
+
+            title_match = re.match(
+                r"^Title\s*::\s*(.*)$",
+                current_text,
+                re.IGNORECASE,
+            )
+            height_match = re.match(
+                r"^Height\s*::\s*(.*)$",
+                current_text,
+                re.IGNORECASE,
+            )
+            fallback_match = re.match(
+                r"^Fallback Image\s*::\s*(.*)$",
+                current_text,
+                re.IGNORECASE,
+            )
+
+            if title_match and title_match.group(1).strip():
+                title = title_match.group(1).strip()
+            elif height_match:
+                height_value = height_match.group(1).strip()
+                if height_value.isdigit() and 300 <= int(height_value) <= 2000:
+                    height = int(height_value)
+            elif fallback_match:
+                fallback_image = fallback_match.group(1).strip().replace("\\", "/")
+
+            i += 1
+
+        if not found_end:
+            click.echo(
+                click.style(
+                    "Warning: HTML Embed block has no END HTML Embed tag.",
+                    fg="yellow",
+                )
+            )
+
+        path = rewrite_asset_path(raw_path, qmd_path, course_dir)
+        safe_path = html.escape(path, quote=True)
+        safe_title = html.escape(title, quote=True)
+        link_label = title.replace("[", "\\[").replace("]", "\\]")
+
+        new_lines.append('::: {.content-visible when-format="html"}')
+        new_lines.append("")
+        new_lines.append(
+            f'<iframe class="html-embed" src="{safe_path}" '
+            f'title="{safe_title}" width="100%" height="{height}" '
+            f'style="border: 0;" '
+            f'loading="lazy" sandbox="allow-scripts allow-downloads" '
+            f'referrerpolicy="no-referrer"></iframe>'
+        )
+        new_lines.append("")
+        new_lines.append(
+            f'[{link_label} — open in a new window]({path})'
+            '{target="_blank" rel="noopener"}'
+        )
+        new_lines.append("")
+        new_lines.append(":::")
+        new_lines.append("")
+
+        new_lines.append('::: {.content-visible unless-format="html"}')
+        new_lines.append("")
+        if fallback_image:
+            fallback_object = Path(fallback_image)
+            if (
+                not fallback_image.startswith("resources/images/")
+                or fallback_object.suffix.lower()
+                not in {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+                or ".." in fallback_object.parts
+                or fallback_object.is_absolute()
+            ):
+                raise ValueError(
+                    "Fallback Image must reference a local image under "
+                    f"resources/images/: {fallback_image}"
+                )
+            fallback_source = course_dir / fallback_image
+            if not fallback_source.is_file():
+                raise FileNotFoundError(
+                    f"HTML Embed fallback image not found: {fallback_source}"
+                )
+            fallback_path = rewrite_asset_path(fallback_image, qmd_path, course_dir)
+            new_lines.append(f"![{link_label}]({fallback_path})")
+            new_lines.append("")
+        new_lines.append(f"[{link_label} — open the interactive version]({path})")
+        new_lines.append("")
+        new_lines.append(":::")
+        new_lines.append("")
+        count += 1
+
+    if count > 0:
+        click.echo(click.style("Detected HTML embeds", fg="blue"))
+        click.echo(f"  Rendering {count} standalone HTML interaction(s)")
+
+    return "\n".join(new_lines), count
+
+
 def parse_images(content: str, qmd_path: Path, course_dir: Path) -> tuple[str, int]:
+    """Render Image blocks, preferring END Image and retaining legacy implicit endings."""
     lines = content.split("\n")
     new_lines = []
     count = 0
@@ -1136,6 +1941,9 @@ def parse_images(content: str, qmd_path: Path, course_dir: Path) -> tuple[str, i
 
         while i < len(lines):
             s = lines[i].strip()
+            if re.match(r"^(?:#+\s*)?END Image\s*$", s, re.IGNORECASE):
+                i += 1
+                break
             if is_markdown_heading(lines[i]) or is_interaction_header(lines[i]):
                 break
 
@@ -1176,6 +1984,7 @@ def parse_images(content: str, qmd_path: Path, course_dir: Path) -> tuple[str, i
 
 
 def parse_files(content: str, qmd_path: Path, course_dir: Path) -> tuple[str, int]:
+    """Render File blocks, preferring END File and retaining legacy implicit endings."""
     lines = content.split("\n")
     new_lines = []
     count = 0
@@ -1198,6 +2007,9 @@ def parse_files(content: str, qmd_path: Path, course_dir: Path) -> tuple[str, in
 
         while i < len(lines):
             s = lines[i].strip()
+            if re.match(r"^(?:#+\s*)?END File\s*$", s, re.IGNORECASE):
+                i += 1
+                break
             if is_markdown_heading(lines[i]) or is_interaction_header(lines[i]):
                 break
 
@@ -1297,6 +2109,9 @@ def parse_interactions(content: str, qmd_path: Path, course_dir: Path) -> str:
     content, count = parse_quiz(content)
     total_interactions += count
 
+    content, count = parse_html_embeds(content, qmd_path, course_dir)
+    total_interactions += count
+
     content, count = parse_images(content, qmd_path, course_dir)
     total_interactions += count
 
@@ -1377,6 +2192,11 @@ def _iter_pages(config):
             for page in section.effective_pages:
                 yield session, section, page
 
+    # Course-level pages use the same import pipeline but do not belong to a
+    # session or section. None placeholders preserve the existing tuple shape.
+    for page in config.standalone_pages:
+        yield None, None, page
+
 
 def _find_target_qmd(course_dir: Path, page_id: str) -> Path | None:
     """Locate generated QMD file by page ID-derived filename."""
@@ -1423,6 +2243,8 @@ def run_import(config_path: str):
 
         imported_count = 0
         skipped_count = 0
+        webr_required = False
+        html_resources_required = False
 
         for _, _, page in _iter_pages(config):
             if not getattr(page, "source_docx", None):
@@ -1453,6 +2275,12 @@ def run_import(config_path: str):
             with open(md_path, "r") as f:
                 raw_md = f.read()
 
+            if contains_webr_directive(raw_md):
+                webr_required = True
+
+            if contains_html_embed_directive(raw_md):
+                html_resources_required = True
+
             warnings = validate_import_content(raw_md, page.id, project_root=Path("."))
             print_validation_warnings(warnings)
 
@@ -1466,6 +2294,16 @@ def run_import(config_path: str):
                 click.echo(
                     click.style(f"Error: Target QMD for page '{page.id}' not found in {course_dir}.", fg="red")
                 )
+
+        if webr_required:
+            click.echo(click.style("WebR content detected", fg="blue"))
+            ensure_webr_support(course_dir)
+        else:
+            click.echo("No WebR content detected; WebR setup not required")
+
+        if html_resources_required:
+            click.echo(click.style("Standalone HTML content detected", fg="blue"))
+            ensure_html_resources(course_dir)
 
         click.echo(click.style(f"✅ Import complete. Imported: {imported_count}, Skipped: {skipped_count}", fg="green"))
 

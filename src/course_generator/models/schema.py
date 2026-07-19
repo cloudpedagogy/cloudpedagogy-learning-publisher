@@ -91,3 +91,6 @@ class Module(BaseModel):
 class CourseConfig(BaseModel):
     module: Module
     sessions: List[Session]
+    # Optional course-level pages appear in the sidebar alongside sessions.
+    # Examples include a glossary, references, accessibility statement, or help page.
+    standalone_pages: List[Page] = Field(default_factory=list)

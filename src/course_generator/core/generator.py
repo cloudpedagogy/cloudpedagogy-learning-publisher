@@ -99,8 +99,11 @@ class Generator:
                 section_slug = self._slugify(section.title)
                 section_prefix = f"sec{section.number:02d}"
                 current_pages = section.effective_pages
-                is_numbered = section.navigation_style == "numbered_subpages"
-                needs_folder = is_numbered or len(current_pages) > 1
+                # A section landing page is useful only when it groups multiple
+                # content pages. Single-page sections link directly to their
+                # content page while retaining the learner-facing
+                # "Section {number}: {title}" navigation label below.
+                needs_folder = len(current_pages) > 1
 
                 if needs_folder:
                     # Keep folder names readable (01-slug) for workspace organization
@@ -181,7 +184,32 @@ class Generator:
         
         sidebar_contents.extend(sessions_nav)
 
-        # 4. Sync Files
+        # 4. Process optional course-level standalone pages. These are
+        # displayed beside sessions in the sidebar rather than inside one.
+        for page in self.config.standalone_pages:
+            filename = f"{page.id}.qmd"
+            output_path = self.output_dir / filename
+            processed_ids.add(page.id)
+
+            pages_to_generate.append({
+                "id": page.id,
+                "template": "pages/standalone_page.qmd.j2",
+                "output_path": output_path,
+                "context": {
+                    "module": self.config.module,
+                    "page": page,
+                    "role": "content_page",
+                    "navigation_style": "default",
+                    "breadcrumbs": [
+                        {"text": self.config.module.code, "href": "index.qmd"},
+                        {"text": page.title}
+                    ]
+                },
+                "title": page.title
+            })
+            sidebar_contents.append({"text": page.title, "href": filename})
+
+        # 5. Sync Files
         for i, pg in enumerate(pages_to_generate):
             # Navigation context
             nav = {"prev": None, "next": None}
@@ -195,7 +223,7 @@ class Generator:
             
             self._sync_file(pg["id"], pg["template"], pg["output_path"], pg["context"])
 
-        # 5. Archive Orphans
+        # 6. Archive Orphans
         archive_dir = self.output_dir / "_archive"
         for fid, path in self.existing_files.items():
             if fid not in processed_ids:
@@ -204,11 +232,11 @@ class Generator:
                 shutil.move(path, target)
                 print(f"Archived: {path} -> {target}")
 
-        # 6. Final Quarto/CSS
+        # 7. Final Quarto/CSS
         self._generate_file("module/default/_quarto.yml.j2", self.output_dir / "_quarto.yml", {"module": self.config.module, "sidebar_contents": sidebar_contents}, force=True)
         self._generate_file("styles.css.j2", self.output_dir / "styles.css", {}, force=True)
 
-        # 7. Cleanup empty folders
+        # 8. Cleanup empty folders
         for root, dirs, _ in os.walk(self.output_dir, topdown=False):
             if "_archive" in root or "assets" in root: continue
             for d in dirs:

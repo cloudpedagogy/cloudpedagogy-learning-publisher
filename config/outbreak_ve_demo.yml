@@ -104,3 +104,9 @@ sessions:
             title: "Reporting and Action"
             kind: text_page
             source_docx: "imports/courses/outbreak_ve_demo/docx/06_reporting_and_public_health_action.docx"
+
+standalone_pages:
+  - id: OUTBREAK_VE_DEMO-glossary
+    title: "Glossary"
+    kind: text_page
+    source_docx: "imports/courses/outbreak_ve_demo/docx/course_glossary.docx"

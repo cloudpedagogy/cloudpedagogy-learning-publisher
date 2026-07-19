@@ -49,6 +49,14 @@ class ConfigLoader:
                     if 'id' not in page:
                         page['id'] = f"{sec_id}-sp{p_idx:02d}"
                         changed = True
+
+        # 3. Optional course-level standalone pages
+        # These pages sit beside sessions in the site navigation.
+        for p_idx, page in enumerate(data.get('standalone_pages', []), 1):
+            if 'id' not in page:
+                page_slug = ConfigLoader._slugify(page.get('title', f'page-{p_idx}'))
+                page['id'] = f"{m_id}-{page_slug}"
+                changed = True
         
         # Write back if we generated any IDs
         if changed:
