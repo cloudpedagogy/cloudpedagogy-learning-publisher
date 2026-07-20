@@ -89,7 +89,7 @@ def replace_details_for_pdf(text: str) -> str:
         return f"{heading}\n\n{content}"
 
     return re.sub(
-        r"<details>\s*<summary>(.*?)</summary>\s*(.*?)\s*</details>",
+        r"<details\b[^>]*>\s*<summary\b[^>]*>(.*?)</summary>\s*(.*?)\s*</details>",
         repl,
         text,
         flags=re.IGNORECASE | re.DOTALL,
@@ -97,9 +97,174 @@ def replace_details_for_pdf(text: str) -> str:
 
 
 def replace_panel_tabsets_for_pdf(text: str) -> str:
-    text = re.sub(r":::\s*\{\s*\.panel-tabset[^}]*\}\s*", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\n:::\s*", "\n", text)
+    """Remove only panel-tabset wrappers, preserving unrelated fenced divs."""
+    lines = text.splitlines()
+    output = []
+    panel_fences = []
+
+    for line in lines:
+        open_match = re.match(
+            r"^\s*(:{3,})\s*\{[^}]*\.panel-tabset\b[^}]*\}\s*$",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if open_match:
+            panel_fences.append(len(open_match.group(1)))
+            continue
+
+        close_match = re.match(r"^\s*(:{3,})\s*$", line)
+        if close_match and panel_fences and len(close_match.group(1)) == panel_fences[-1]:
+            panel_fences.pop()
+            continue
+
+        output.append(line)
+
+    return "\n".join(output)
+
+
+def remove_script_and_style_blocks(text: str) -> str:
+    """Remove browser-only JavaScript and CSS from handbook content."""
+    text = re.sub(
+        r"<script\b[^>]*>.*?</script>",
+        "",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    text = re.sub(
+        r"<style\b[^>]*>.*?</style>",
+        "",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
     return text
+
+
+def replace_rich_quizzes_for_pdf(text: str) -> str:
+    """
+    Convert rich interactive quiz divisions into static handbook Markdown.
+
+    The source QMD remains unchanged. Browser-only inputs, buttons, container
+    attributes and hidden state are removed, while rich option content,
+    equations, code blocks, explanations and per-option feedback are retained.
+    """
+    lines = text.splitlines()
+    output = []
+    i = 0
+    quiz_number = 0
+
+    def closing_index(start: int, fence_length: int) -> int | None:
+        closing = ":" * fence_length
+        for position in range(start + 1, len(lines)):
+            if lines[position].strip() == closing:
+                return position
+        return None
+
+    def clean_option(option_lines: list[str], number: int) -> list[str]:
+        correct = any(
+            re.search(r'data-correct=["\']true["\']', line, flags=re.IGNORECASE)
+            for line in option_lines
+        )
+        label = f"**Option {number}"
+        if correct:
+            label += " — correct answer"
+        label += "**"
+        cleaned = [label, ""]
+
+        for option_line in option_lines:
+            stripped = option_line.strip()
+
+            if re.match(r"^:{3,}\s*\{[^}]*\.quiz-option-feedback\b", stripped):
+                cleaned.extend(["", "**Feedback:**", ""])
+                continue
+            if re.match(r"^:{3,}(?:\s*\{.*\})?\s*$", stripped):
+                continue
+            if re.match(r"<input\b", stripped, flags=re.IGNORECASE):
+                continue
+
+            label_match = re.match(
+                r"<label\b[^>]*>(.*?)</label>",
+                stripped,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if label_match:
+                cleaned.append(strip_inline_html_tags(label_match.group(1)))
+                continue
+
+            cleaned.append(option_line)
+
+        return cleaned
+
+    while i < len(lines):
+        quiz_open = re.match(
+            r"^\s*(:{3,})\s*\{[^}]*\.quiz-block\b[^}]*\}\s*$",
+            lines[i],
+            flags=re.IGNORECASE,
+        )
+        if not quiz_open:
+            output.append(lines[i])
+            i += 1
+            continue
+
+        quiz_end = closing_index(i, len(quiz_open.group(1)))
+        if quiz_end is None:
+            # Preserve malformed source so Quarto can report its location.
+            output.append(lines[i])
+            i += 1
+            continue
+
+        quiz_number += 1
+        block = lines[i + 1:quiz_end]
+        converted = [f"**Quiz {quiz_number}**", ""]
+        j = 0
+        option_number = 0
+
+        while j < len(block):
+            option_open = re.match(
+                r"^\s*(:{3,})\s*\{[^}]*\.quiz-option\b[^}]*\}\s*$",
+                block[j],
+                flags=re.IGNORECASE,
+            )
+            if option_open:
+                option_close = None
+                closing = ":" * len(option_open.group(1))
+                for position in range(j + 1, len(block)):
+                    if block[position].strip() == closing:
+                        option_close = position
+                        break
+                if option_close is None:
+                    converted.append(block[j])
+                    j += 1
+                    continue
+
+                option_number += 1
+                converted.extend(
+                    clean_option(block[j + 1:option_close], option_number)
+                )
+                converted.append("")
+                j = option_close + 1
+                continue
+
+            stripped = block[j].strip()
+            if re.match(r"^:{3,}\s*\{[^}]*\.quiz-explanation\b", stripped):
+                j += 1
+                continue
+            if re.match(r"^:{3,}(?:\s*\{.*\})?\s*$", stripped):
+                j += 1
+                continue
+            if re.search(r"class=[" + "'\"" + r"]quiz-(?:actions|feedback)", stripped, flags=re.IGNORECASE):
+                j += 1
+                continue
+            if re.search(r"<button\b", stripped, flags=re.IGNORECASE):
+                j += 1
+                continue
+
+            converted.append(block[j])
+            j += 1
+
+        output.extend(converted)
+        i = quiz_end + 1
+
+    return "\n".join(output)
 
 
 def replace_iframes_for_pdf(text: str) -> str:
@@ -463,6 +628,8 @@ def clean_content(text: str) -> str:
     text = replace_callouts_for_pdf(text)
     text = replace_details_for_pdf(text)
     text = replace_panel_tabsets_for_pdf(text)
+    text = replace_rich_quizzes_for_pdf(text)
+    text = remove_script_and_style_blocks(text)
     text = replace_iframes_for_pdf(text)
     text = replace_resource_links_for_pdf(text)
     text = replace_quiz_forms_for_pdf(text)
