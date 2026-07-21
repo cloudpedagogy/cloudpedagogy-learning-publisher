@@ -309,6 +309,60 @@ def normalize_metadata_blocks(content: str) -> str:
     return "\n".join(normalized_lines)
 
 
+def normalize_doubled_latex_backslashes(math_text: str) -> str:
+    """
+    Normalize backslashes duplicated by Word/Pandoc inside a maths region.
+
+    A doubled backslash is reduced only when it introduces a LaTeX command
+    (for example ``\\\\frac`` or ``\\\\alpha``) or an escaped LaTeX symbol
+    (for example ``\\\\%``). A standalone ``\\\\`` is preserved because it
+    may be an intentional LaTeX line break.
+    """
+    return re.sub(r"\\\\(?=[A-Za-z]+|[%#&_{}])", r"\\", math_text)
+
+
+def normalize_latex_in_math_regions(content: str) -> str:
+    """
+    Normalize doubled LaTeX backslashes only inside recognised maths regions.
+
+    Markdown fenced code blocks are deliberately excluded so R code, regular
+    expressions, paths and other code containing backslashes are unchanged.
+    Supported maths delimiters are ``$...$``, ``$$...$$``, ``\\(...\\)`` and
+    ``\\[...\\]``.
+    """
+    math_pattern = re.compile(
+        r"""
+        \$\$.*?\$\$                  # Display maths: $$ ... $$
+        |
+        (?<!\\)\$(?!\$).*?(?<!\\)\$  # Inline maths: $ ... $
+        |
+        \\\(.*?\\\)                   # Inline maths: \( ... \)
+        |
+        \\\[.*?\\\]                   # Display maths: \[ ... \]
+        """,
+        re.VERBOSE | re.DOTALL,
+    )
+    fenced_code_pattern = re.compile(
+        r"(^[ \t]*(`{3,}|~{3,})[^\n]*\n.*?^[ \t]*\2[ \t]*$)",
+        re.MULTILINE | re.DOTALL,
+    )
+
+    parts = fenced_code_pattern.split(content)
+    # The capturing groups make each match occupy three consecutive entries:
+    # full fence, delimiter, then the following non-code text.
+    for index in range(0, len(parts), 3):
+        parts[index] = math_pattern.sub(
+            lambda match: normalize_doubled_latex_backslashes(match.group(0)),
+            parts[index],
+        )
+
+    return "".join(
+        part
+        for index, part in enumerate(parts)
+        if index % 3 != 2  # Omit the duplicated fence-delimiter capture.
+    )
+
+
 def normalize_math_blocks(content: str) -> str:
     """
     Normalize LaTeX math emitted by Pandoc/Word.
@@ -336,9 +390,6 @@ def normalize_math_blocks(content: str) -> str:
         line = line.replace(r"\\)", r"\)")
         line = line.replace(r"\^", "^")
 
-        # Fix double-escaped LaTeX commands
-        line = line.replace(r"\\binom", r"\binom")
-
         normalized_lines.append(line)
 
     # Word/Pandoc can insert empty paragraphs immediately inside display-math
@@ -358,7 +409,8 @@ def normalize_math_blocks(content: str) -> str:
 
         compacted_lines.append(line)
 
-    return "\n".join(compacted_lines)
+    content = "\n".join(compacted_lines)
+    return normalize_latex_in_math_regions(content)
 
 
 def clean_r_code(code: str) -> str:

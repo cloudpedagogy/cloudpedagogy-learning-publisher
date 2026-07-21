@@ -36,12 +36,6 @@ def clean_html_tags(text: str) -> str:
     return text
 
 
-def fix_unicode_math(text: str) -> str:
-    text = text.replace("R₀", r"$R_0$")
-    text = text.replace("basic reproduction number (R0)", r"basic reproduction number ($R_0$)")
-    return text
-
-
 def clean_step_markers(text: str) -> str:
     text = re.sub(r"(?m)^\s*[-*•]?\s*Step\s+(\d+)\s*::\s*(.+)$", r"\1. \2", text)
     text = re.sub(r"(?m)^\s*[-*•]?\s*Step\s+(\d+):\s*(.+)$", r"\1. \2", text)
@@ -402,10 +396,88 @@ def remove_duplicate_resource_lines(text: str) -> str:
 
 
 def remove_stray_markdown_artifacts(text: str) -> str:
-    text = re.sub(r"\s+##\s*(?=\n|$)", "", text)
-    text = re.sub(r"^\s*##\s*$", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\.\s+##\s+([A-Z])", r".\n\n## \1", text)
-    return text
+    """Repair heading artefacts without changing fenced code blocks.
+
+    Word-imported interaction content can occasionally place a Markdown
+    heading after prose on the same line.  Pandoc then treats the heading
+    marker as literal text in DOCX output.  Process prose regions only, split
+    joined level 1-6 headings onto their own lines, remove empty ``##``
+    artefacts, and ensure headings have blank lines around them.
+    """
+    def clean_prose(prose: str) -> str:
+        # Remove empty level-two heading markers left by interaction cleanup.
+        prose = re.sub(r"^\s*##\s*$", "", prose, flags=re.MULTILINE)
+        prose = re.sub(r"[ \t]+##[ \t]*(?=\n|$)", "", prose)
+
+        # Move an embedded heading to a new paragraph. Requiring a letter or
+        # number after the marker avoids treating a bare hash sequence as a
+        # heading. Fenced code is excluded by the outer split.
+        prose = re.sub(
+            r"(?m)(\S)[ \t]+(#{1,6})[ \t]+(?=[^\W_])",
+            r"\1\n\n\2 ",
+            prose,
+        )
+
+        # Give every genuine ATX heading a blank line before and after it so
+        # Pandoc consistently recognises it in both DOCX and PDF output.
+        lines = prose.splitlines()
+        output: list[str] = []
+        heading_pattern = re.compile(r"^\s{0,3}#{1,6}[ \t]+\S")
+
+        for line in lines:
+            if heading_pattern.match(line):
+                if not output or output[-1].strip():
+                    output.append("")
+                output.append(line.rstrip())
+                output.append("")
+            else:
+                output.append(line)
+
+        return "\n".join(output)
+
+    # Split prose and fenced code with a small line-based state machine.  A
+    # closing fence must use the same character as the opener and be at least
+    # as long, so backtick and tilde fences cannot be paired accidentally.
+    blocks: list[tuple[bool, str]] = []
+    current: list[str] = []
+    in_fence = False
+    fence_char = ""
+    fence_length = 0
+
+    def flush(is_code: bool) -> None:
+        if current:
+            blocks.append((is_code, "".join(current)))
+            current.clear()
+
+    for line in text.splitlines(keepends=True):
+        if not in_fence:
+            opener = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
+            if opener:
+                flush(False)
+                marker = opener.group(1)
+                fence_char = marker[0]
+                fence_length = len(marker)
+                in_fence = True
+            current.append(line)
+            continue
+
+        current.append(line)
+        closer = re.match(
+            rf"^ {{0,3}}{re.escape(fence_char)}{{{fence_length},}}[ \t]*(?:\r?\n)?$",
+            line,
+        )
+        if closer:
+            flush(True)
+            in_fence = False
+            fence_char = ""
+            fence_length = 0
+
+    flush(in_fence)
+
+    return "".join(
+        block if is_code else clean_prose(block)
+        for is_code, block in blocks
+    )
 
 
 def remove_web_navigation(text: str) -> str:
@@ -519,11 +591,11 @@ def rewrite_markdown_paths_for_handbook(
     Rewrite local Markdown image and link paths for the combined handbook.
 
     Content copied from a nested QMD page may contain a path such as:
-        ../../resources/images/epidemic-curve.png
+        ../../resources/images/example-chart.png
 
     Once that content is moved into a handbook at the course root, the same
     asset may need to be referenced as:
-        resources/images/epidemic-curve.png
+        resources/images/example-chart.png
     """
 
     markdown_pattern = re.compile(
@@ -637,7 +709,6 @@ def clean_content(text: str) -> str:
 
     text = clean_html_tags(text)
     text = clean_step_markers(text)
-    text = fix_unicode_math(text)
     text = remove_duplicate_resource_lines(text)
     text = remove_stray_markdown_artifacts(text)
     text = tidy_spacing(text)
@@ -754,8 +825,8 @@ def main():
         print("  python3 src/course_generator/tools/build_handbook_from_quarto.py <course_dir> [output_qmd]")
         print("")
         print("Examples:")
-        print("  python3 src/course_generator/tools/build_handbook_from_quarto.py course/outbreak_ve_demo")
-        print("  python3 src/course_generator/tools/build_handbook_from_quarto.py course/outbreak_ve_demo output/outbreak_handbook.qmd")
+        print("  python3 src/course_generator/tools/build_handbook_from_quarto.py build/courses/my_course")
+        print("  python3 src/course_generator/tools/build_handbook_from_quarto.py build/courses/my_course output/my_course_handbook.qmd")
         sys.exit(1)
 
     course_dir = Path(sys.argv[1]).resolve()
@@ -787,6 +858,7 @@ def main():
         "    toc-depth: 2",
         "    number-sections: false",
         "    pdf-engine: lualatex",
+        "    papersize: a4",
         "  docx:",
         "    toc: true",
         "    toc-depth: 2",
