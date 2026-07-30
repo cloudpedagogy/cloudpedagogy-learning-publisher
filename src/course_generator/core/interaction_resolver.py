@@ -1,6 +1,7 @@
 import yaml
 import os
 from pathlib import Path
+from typing import Dict, Optional
 from jinja2 import Environment, FileSystemLoader
 
 class InteractionResolver:

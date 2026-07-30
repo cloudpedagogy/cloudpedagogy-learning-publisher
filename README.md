@@ -1,35 +1,30 @@
 # CloudPedagogy Learning Publisher
 
-CloudPedagogy Learning Publisher is a Word-first publishing system for creating accessible, maintainable e-learning with Quarto. Educators can author content in Microsoft Word while the platform handles course structure, interaction conversion, navigation, resources and publication.
+CloudPedagogy Learning Publisher is a Word-first publishing system for creating accessible, maintainable online learning with Quarto. Educators can author content in Microsoft Word while the system manages course structure, interaction conversion, navigation, resources and publication.
 
-The system layers a structured publishing workflow on top of Quarto. Authors do not need to write Quarto Markdown directly for routine course development.
-
+The Learning Publisher adds a structured course-production workflow on top of Quarto. Authors do not need to write Quarto Markdown directly for routine course development.
 
 ## Live demo
 
 [Explore the Outbreak Investigation and Vaccine Effectiveness demo](https://cloudpedagogy-learning-publisher.s3.eu-west-2.amazonaws.com/outbreak_ve_demo/se01/OUTBREAK_VE_DEMO-se01-sec01-sp01.html)
 
-This demonstration highlights one part of the Learning Publisher ecosystem: transforming structured Word content into an interactive Quarto learning page. It includes course navigation, rich content, self-checks, reveal activities, tabs, a quiz, interactive R with WebR and an embedded Plotly visualisation.
+The demo shows structured Word content published as an interactive Quarto learning page. It includes course navigation, rich content, self-checks, reveal activities, tabs, a quiz, browser-based R using WebR and an embedded Plotly visualisation.
 
-Additional demonstrations and publishing applications will be added as the ecosystem develops.
+## Core outputs
 
-## What it produces
-
-Depending on the workflow and configuration, the project supports:
+Depending on the course configuration, Learning Publisher can create:
 
 - Multi-page Quarto learning websites
-- Printable HTML and PDF handbooks
-- RevealJS presentations
-- Twine scenarios
-- Moodle Book conversion and quality assurance
-- Moodle course audit reports
+- Printable course HTML
+- Individual lesson PDFs and combined PDF handbooks
 - Interactive R activities using WebR
-- Mermaid diagrams and Plotly visualisations
-- Custom standalone HTML interactions
+- Static R code examples and outputs
+- Quizzes, self-checks, reveals, tabs and callouts
+- Embedded images, files, videos and HTML interactions
+
+Specialist Moodle utilities and Word-to-JavaScript renderers are maintained separately from the core Learning Publisher.
 
 ## Publishing workflow
-
-The standard course workflow is:
 
 ```text
 Microsoft Word source documents
@@ -40,18 +35,25 @@ Generate the Quarto course scaffold
             ↓
 Import and transform Word content
             ↓
-Render the published course and handbook outputs
+Render the course website and configured page outputs
+            ↓
+Optionally assemble a combined handbook
 ```
 
-Word documents remain the editable content source. YAML defines the learning structure and navigation. Python import tools translate supported Word directives into Quarto-compatible components.
+The standard workflow renders the course website and any configured page
+outputs. Combined handbooks are an optional post-processing step provided by
+a separate publishing utility.
+
+Word documents remain the editable content source. YAML defines the course hierarchy, page identifiers, titles, navigation and source-document paths. The Python importer translates supported Word directives into Quarto-compatible Markdown and HTML components.
 
 ## Requirements
 
 - Python 3.10 or later
 - Quarto
-- Pandoc
+- Pandoc, normally provided through the Quarto installation
 - Git
 - TinyTeX when PDF output is required
+- R and the required R packages when static R code is executed during rendering
 
 Check the installed tools:
 
@@ -66,6 +68,10 @@ Install TinyTeX if PDF publishing is required:
 ```bash
 quarto install tinytex
 ```
+
+When WebR content is detected, the importer checks for the trusted
+`coatless/quarto-webr` extension, installs it when necessary and enables the
+WebR filter. Internet access is required for the initial extension installation.
 
 ## Installation
 
@@ -94,7 +100,7 @@ Activate it in Windows PowerShell:
 .venv\Scripts\Activate.ps1
 ```
 
-Install the dependencies:
+Install the Python dependencies:
 
 ```bash
 python -m pip install --upgrade pip
@@ -103,7 +109,7 @@ python -m pip install -r requirements.txt
 
 ## Quick start
 
-From the project root, run the following commands in order. Replace the configuration filename with the course being published.
+From the repository root, run the following commands in order. Replace the example configuration filename with the course you want to publish.
 
 ```bash
 PYTHONPATH=src python3 -m course_generator.cli build config/outbreak_ve_demo.yml
@@ -119,11 +125,11 @@ PYTHONPATH=src python3 -m course_generator.cli render config/outbreak_ve_demo.ym
 
 These commands:
 
-1. Generate or update the Quarto scaffold and navigation.
+1. Generate or update the Quarto project, page scaffold and navigation.
 2. Convert the configured Word documents and insert their content into the generated pages.
-3. Render a new versioned publication under `output/courses/`.
+3. Render a versioned publication under `output/courses/`.
 
-Run `build` before `import-word`, and run `render` last. The final rendered version is the version created after the latest import.
+Run `build` before `import-word`, and run `render` after the latest import.
 
 ## Course configuration
 
@@ -146,6 +152,8 @@ subpages:
     source_docx: "imports/courses/outbreak_ve_demo/docx/01_vaccine_effectiveness_outbreak.docx"
 ```
 
+The optional [CloudPedagogy Word Course Splitter](https://github.com/cloudpedagogy/cloudpedagogy-word-course-splitter) can split a structured master Word document and generate Learning Publisher-compatible DOCX files and YAML paths.
+
 ### Course-level standalone pages
 
 Pages such as a glossary, references, help or accessibility information can appear at the same navigation level as the sessions:
@@ -162,11 +170,9 @@ Standalone pages use `templates/pages/standalone_page.qmd.j2`. The feature is ge
 
 ## Word-first interactions
 
-Authors can include supported directives as ordinary text in Word. During import, the directives are converted into Quarto or HTML components.
+Authors can add supported directives as ordinary text in Word. During import, the directives are converted into Quarto or HTML components.
 
 ### Reveal
-
-Reveal accepts paragraphs, lists, tables, equations, links and other Markdown-compatible content.
 
 ```text
 Reveal
@@ -186,7 +192,7 @@ Answer :: Differences in exposure and population structure can influence estimat
 END SelfCheck
 ```
 
-The suggested answer is hidden until the learner opens it. Answers can contain multiple paragraphs, lists, tables and equations.
+The suggested answer remains hidden until the learner opens it. Answers can contain multiple paragraphs, lists, tables and equations.
 
 ### Callout
 
@@ -236,17 +242,35 @@ Block directives should use their corresponding explicit end tags, such as `END 
 
 Property lines belong to their surrounding block and do not need separate end tags. Examples include `Label ::`, `Question ::`, `Answer ::`, `Option ::`, `Explanation ::`, `Alt ::`, `Caption ::`, `Width ::`, `Echo ::` and `Output ::`.
 
-## WebR
+## R content
 
-WebR enables R code to run in the learner's browser. Use the following within an `R Code` block:
+An `R Code` block can use either a non-interactive static presentation or WebR:
 
 ```text
+R Code
 R Mode :: webr
+Echo :: true
+Output :: true
+# Add R code here
+END R Code
 ```
 
-When the importer detects WebR content, it checks the WebR extension and enables the required Quarto filter. Static R blocks continue to use `R Mode :: static`.
+- `R Mode :: static` publishes a non-interactive R example.
+- `R Mode :: webr` provides interactive R execution in the learner's browser.
+- `Echo :: true` displays the code.
+- `Echo :: false` hides the code.
+- `Output :: true` displays the result when supported.
+- `Output :: false` suppresses the result.
 
-The WebR interface may add controls such as **View R History**, which lets learners review commands executed in interactive R cells.
+When the importer detects WebR content, it checks for the trusted
+`coatless/quarto-webr` extension, installs it when necessary and enables the
+required Quarto filter. The WebR interface may include controls such as **View
+R History**, allowing learners to review commands executed in interactive
+cells.
+
+If a static R block is configured to execute during Quarto rendering, R and all
+packages used by that block must be installed locally. Static blocks that only
+display code do not require local execution.
 
 ## Standalone HTML interactions
 
@@ -259,7 +283,9 @@ Height :: 750
 END HTML Embed
 ```
 
-Self-contained HTML files are the most portable option because their JavaScript and supporting assets travel with the interaction. HTML that relies on a content delivery network requires an internet connection. Multi-file HTML applications require their supporting folders and relative paths to be preserved.
+Self-contained HTML files are the most portable option because their JavaScript and supporting assets travel with the interaction. HTML that relies on a content delivery network requires an internet connection. Multi-file applications require their supporting folders and relative paths to remain intact.
+
+Learning Publisher embeds these interactions; specialist renderer source code is maintained in its own repository rather than duplicated here.
 
 ## Resources
 
@@ -280,6 +306,27 @@ resources/
 
 The Word importer copies referenced site resources into the generated course and rewrites paths relative to the target Quarto page.
 
+For public demonstrations, use only resources and video links that are publicly accessible and that you have permission to publish. Institutionally restricted Panopto content should be replaced with an authorised public example or a placeholder.
+
+## Handbook utilities
+
+The retained publishing utilities include:
+
+```text
+src/course_generator/tools/
+├── build_document_assembly.py
+├── build_handbook_from_quarto.py
+└── import_word.py
+```
+
+Use `build_handbook_from_quarto.py` to assemble course pages into a combined
+printable handbook. Run the command with `--help` for the options available in
+the installed version:
+
+```bash
+python3 src/course_generator/tools/build_handbook_from_quarto.py --help
+```
+
 ## Project structure
 
 ```text
@@ -290,9 +337,10 @@ resources/      Shared course assets
 src/            Python application code
 templates/      Quarto and interaction templates
 build/          Generated Quarto working projects
-output/         Rendered publications and reports
+output/         Rendered course publications
 tests/          Automated tests
-tools/          Supporting utilities
+src/course_generator/tools/
+                Supporting publishing utilities
 ```
 
 Important implementation files include:
@@ -300,6 +348,7 @@ Important implementation files include:
 ```text
 src/course_generator/core/config_loader.py
 src/course_generator/core/generator.py
+src/course_generator/interaction_resolver.py
 src/course_generator/models/schema.py
 src/course_generator/tools/import_word.py
 templates/pages/standalone_page.qmd.j2
@@ -309,7 +358,22 @@ templates/pages/standalone_page.qmd.j2
 
 Treat `config/`, `src/`, `templates/`, reusable resources and intentional Word sources as maintainable project inputs. The `build/` and `output/` directories are generated and can normally be recreated.
 
-Review `.gitignore` before committing large source documents, extracted media or generated output. Keep course source files in version control when they are required to reproduce a published course and their inclusion is permitted.
+Review `.gitignore` before committing large source documents, extracted media or generated output. Keep course source files in version control only when they are needed to reproduce a public course and you have permission to distribute them.
+
+Python cache files are generated locally and should not be committed:
+
+```gitignore
+__pycache__/
+*.py[cod]
+```
+
+## Companion projects
+
+Related tools are maintained separately so that Learning Publisher remains focused:
+
+- [CloudPedagogy Word Course Splitter](https://github.com/cloudpedagogy/cloudpedagogy-word-course-splitter)
+- CloudPedagogy Moodle conversion and course-analysis tools
+- CloudPedagogy Word-to-JavaScript visualisation renderers
 
 ## Documentation
 
@@ -319,8 +383,9 @@ Additional operational and developer documentation can be maintained under `docs
 - The source Word document locations
 - Required Quarto extensions
 - Resource dependencies
-- The three publishing commands
-- Any deployment or Moodle upload steps
+- The publishing commands
+- Handbook steps, when used
+- Deployment or LMS upload steps
 
 ## Licence
 
