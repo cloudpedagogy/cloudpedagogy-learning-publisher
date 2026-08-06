@@ -22,7 +22,7 @@ def contains_webr_directive(content: str) -> bool:
     """Return True when imported Markdown requests browser-based WebR."""
     normalized = re.sub(r"\\\s*\n", "\n", content)
     return re.search(
-        r"^\s*R Mode\s*::\s*webr\s*$",
+        r"^\s*(?:R\s+)?Mode\s*::\s*webr\s*$",
         normalized,
         re.IGNORECASE | re.MULTILINE,
     ) is not None
@@ -245,9 +245,15 @@ def normalize_metadata_blocks(content: str) -> str:
         "Explanation ::",
         "R Code",
         "END R Code",
+        "JavaScript Interaction",
+        "END JavaScript Interaction",
+        "Container ID ::",
+        "Interaction ::",
         "R Example",
         "END R Example",
         "R Mode ::",
+        "Mode ::",
+        "Source ::",
         "Echo ::",
         "Output ::",
         "Alt ::",
@@ -624,11 +630,17 @@ def apply_following_alt_text_to_images(content: str) -> str:
     return "\n".join(new_lines)
 
 
-def copy_site_resources(course_dir: Path):
-    """Copy top-level project resources into the generated course directory."""
-    source_resources = Path("resources")
+def copy_site_resources(course_source_dir: Path, course_dir: Path):
+    """Copy authored resources into the generated course directory.
+
+    Prefer the self-contained course ``resources/`` folder. The old top-level
+    ``resources/`` location remains as a compatibility fallback.
+    """
+    source_resources = course_source_dir / "resources"
     if not source_resources.exists():
-        click.echo(click.style("No top-level resources/ directory found; skipping resource copy", fg="yellow"))
+        source_resources = Path("resources")
+    if not source_resources.exists():
+        click.echo(click.style("No course or top-level resources/ directory found; skipping resource copy", fg="yellow"))
         return
 
     dest_resources = course_dir / "resources"
@@ -651,6 +663,8 @@ def is_interaction_header(line: str) -> bool:
         for pattern in [
             r"^(?:#+\s*)?R Code\s*$",
             r"^(?:#+\s*)?END R Code\s*$",
+            r"^(?:#+\s*)?JavaScript Interaction\s*$",
+            r"^(?:#+\s*)?END JavaScript Interaction\s*$",
             r"^(?:#+\s*)?R Example\s*$",
             r"^(?:#+\s*)?END R Example\s*$",
             r"^(?:#+\s*)?Tabs\s*$",
@@ -753,6 +767,7 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
         "tabs": "Tabs",
         "quiz": "Quiz",
         "r code": "R Code",
+        "javascript interaction": "JavaScript Interaction",
         "r example": "R Example",
         "image": "Image",
         "file": "File",
@@ -767,7 +782,7 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
             continue
 
         end_match = re.match(
-            r"^(?:#+\s*)?END\s+(Callout|Reveal|SelfCheck|Tabs|Quiz|R Code|R Example|Image|File|HTML Embed)\s*$",
+            r"^(?:#+\s*)?END\s+(Callout|Reveal|SelfCheck|Tabs|Quiz|R Code|R Example|JavaScript Interaction|Image|File|HTML Embed)\s*$",
             line,
             re.IGNORECASE,
         )
@@ -805,7 +820,7 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
             continue
 
         opener_match = re.match(
-            r"^(?:#+\s*)?(Callout\s*::\s*.+|Reveal|SelfCheck|Tabs|Quiz|R Code|R Example|Image\s*::\s*.+|File\s*::\s*.+|HTML Embed\s*::\s*.+)\s*$",
+            r"^(?:#+\s*)?(Callout\s*::\s*.+|Reveal|SelfCheck|Tabs|Quiz|R Code|R Example|JavaScript Interaction|Image\s*::\s*.+|File\s*::\s*.+|HTML Embed\s*::\s*.+)\s*$",
             line,
             re.IGNORECASE,
         )
@@ -815,14 +830,14 @@ def validate_import_content(content: str, page_id: str = "", project_root: Path 
             block_stack.append((name, idx))
 
         malformed_match = re.match(
-            r"^(YouTubeEmbed|PanoptoEmbed|HTML Embed|Image|File|Callout|Title|Question|Type|Option|Answer|Correct|Feedback|Hint|Explanation|Caption|Alt|Width|Height|Fallback Image|Display|Label|R Mode|Echo|Output)\s*:\s+\S+",
+            r"^(YouTubeEmbed|PanoptoEmbed|HTML Embed|JavaScript Interaction|Image|File|Callout|Title|Question|Type|Option|Answer|Correct|Feedback|Hint|Explanation|Caption|Alt|Width|Height|Fallback Image|Display|Label|R Mode|Mode|Source|Container ID|Interaction|Echo|Output)\s*:\s+\S+",
             line,
             re.IGNORECASE,
         )
         if malformed_match:
             warnings.append(f"{page_id} line {idx}: possible directive syntax error. Use '::' not ':'.")
 
-        r_mode_match = re.match(r"^R Mode\s*::\s*(.+)$", line, re.IGNORECASE)
+        r_mode_match = re.match(r"^(?:R\s+)?Mode\s*::\s*(.+)$", line, re.IGNORECASE)
         if r_mode_match:
             mode = r_mode_match.group(1).strip().rstrip("\\").strip().lower()
             if mode not in ["static", "r", "webr"]:
@@ -1053,7 +1068,202 @@ def parse_r_example(content: str) -> tuple[str, int]:
     return "\n".join(new_lines), count
 
 
-def parse_r_code(content: str) -> tuple[str, int]:
+def resolve_r_code_source(source: str, course_source_dir: Path) -> str:
+    """Read a safe, course-relative external R source file."""
+    source = source.strip().rstrip("\\").strip()
+    if not source:
+        raise ValueError("Source :: in an R Code block cannot be empty.")
+
+    relative_source = Path(source)
+    if relative_source.is_absolute():
+        raise ValueError(f"R source must be relative to the course folder: {source}")
+    if relative_source.suffix.lower() != ".r":
+        raise ValueError(f"R source must be an .R file: {source}")
+
+    course_root = course_source_dir.resolve()
+    source_path = (course_root / relative_source).resolve()
+    try:
+        source_path.relative_to(course_root)
+    except ValueError as exc:
+        raise ValueError(f"R source must remain inside the course folder: {source}") from exc
+
+    if not source_path.is_file():
+        raise FileNotFoundError(f"R source file not found: {source_path}")
+    return source_path.read_text(encoding="utf-8")
+
+
+def resolve_javascript_source(source: str, course_source_dir: Path) -> str:
+    """Read a safe, course-relative plain JavaScript source file."""
+    source = source.strip().rstrip("\\").strip()
+    if not source:
+        raise ValueError(
+            "Source :: in a JavaScript Interaction block cannot be empty."
+        )
+
+    relative_source = Path(source)
+    if relative_source.is_absolute():
+        raise ValueError(
+            f"JavaScript source must be relative to the course folder: {source}"
+        )
+    if relative_source.suffix.lower() != ".js":
+        raise ValueError(f"JavaScript source must be a .js file: {source}")
+
+    course_root = course_source_dir.resolve()
+    source_path = (course_root / relative_source).resolve()
+    try:
+        source_path.relative_to(course_root)
+    except ValueError as exc:
+        raise ValueError(
+            f"JavaScript source must remain inside the course folder: {source}"
+        ) from exc
+
+    if not source_path.is_file():
+        raise FileNotFoundError(f"JavaScript source file not found: {source_path}")
+
+    script = source_path.read_text(encoding="utf-8")
+    if re.search(r"</script\s*>", script, re.IGNORECASE):
+        raise ValueError(
+            f"JavaScript source cannot contain a closing </script> tag: {source}"
+        )
+    return script
+
+
+def parse_javascript_interactions(
+    content: str,
+    course_source_dir: Path | None = None,
+) -> tuple[str, int]:
+    """Inline course-local plain JavaScript interactions into the generated page.
+
+    Syntax:
+
+    JavaScript Interaction
+    Source :: code/example.js
+    Container ID :: example-interaction
+    Interaction :: example
+    Alt :: Accessible description
+    Caption :: Optional visible caption
+    END JavaScript Interaction
+
+    This component intentionally emits ordinary inline JavaScript rather than
+    an iframe, a module, or a runtime server dependency.
+    """
+    lines = content.split("\n")
+    new_lines = []
+    count = 0
+    in_block = False
+    metadata = {}
+
+    def flush_block():
+        nonlocal metadata
+        if course_source_dir is None:
+            raise ValueError(
+                "A JavaScript Interaction requires the course configuration directory."
+            )
+
+        source = metadata.get("source", "")
+        container_id = metadata.get("container id", "")
+        interaction = metadata.get("interaction", "")
+        alt_text = metadata.get("alt", "")
+        caption = metadata.get("caption", "")
+
+        if not source:
+            raise ValueError("JavaScript Interaction requires Source ::.")
+        if not container_id:
+            raise ValueError("JavaScript Interaction requires Container ID ::.")
+        if not interaction:
+            raise ValueError("JavaScript Interaction requires Interaction ::.")
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.:-]*", container_id):
+            raise ValueError(
+                "Container ID must begin with a letter and contain only letters, "
+                f"numbers, '.', '_', ':', or '-': {container_id}"
+            )
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", interaction):
+            raise ValueError(
+                "Interaction must contain only letters, numbers, '_' or '-': "
+                f"{interaction}"
+            )
+
+        script = resolve_javascript_source(source, course_source_dir)
+        accessible_label = alt_text or caption or "Interactive learning activity"
+        escaped_id = html.escape(container_id, quote=True)
+        escaped_interaction = html.escape(interaction, quote=True)
+        escaped_label = html.escape(accessible_label, quote=True)
+
+        new_lines.extend(
+            [
+                '<figure class="javascript-interaction-figure">',
+                (
+                    f'<div id="{escaped_id}" class="javascript-interaction" '
+                    f'data-js-interaction="{escaped_interaction}" role="group" '
+                    f'aria-label="{escaped_label}"></div>'
+                ),
+            ]
+        )
+        if caption:
+            new_lines.append(
+                '<figcaption class="javascript-interaction-caption">'
+                f"{html.escape(caption)}"
+                "</figcaption>"
+            )
+        new_lines.extend(["</figure>", "<script>", script.rstrip(), "</script>"])
+        metadata = {}
+
+    for line in lines:
+        stripped = line.strip()
+        if not in_block:
+            if re.match(
+                r"^(?:#+\s*)?JavaScript Interaction\s*$",
+                stripped,
+                re.IGNORECASE,
+            ):
+                in_block = True
+                metadata = {}
+                count += 1
+            else:
+                new_lines.append(line)
+            continue
+
+        if re.match(
+            r"^(?:#+\s*)?END JavaScript Interaction\s*$",
+            stripped,
+            re.IGNORECASE,
+        ):
+            flush_block()
+            in_block = False
+            continue
+
+        metadata_match = re.match(
+            r"^(Source|Container ID|Interaction|Alt|Caption)\s*::\s*(.*)$",
+            stripped,
+            re.IGNORECASE,
+        )
+        if metadata_match:
+            key = metadata_match.group(1).lower()
+            if key in metadata:
+                raise ValueError(
+                    f"JavaScript Interaction contains duplicate {metadata_match.group(1)} ::."
+                )
+            metadata[key] = metadata_match.group(2).strip().rstrip("\\").strip()
+        elif stripped:
+            raise ValueError(
+                "Unexpected content in JavaScript Interaction block: "
+                f"{stripped}"
+            )
+
+    if in_block:
+        raise ValueError(
+            "JavaScript Interaction block has no explicit "
+            "END JavaScript Interaction tag."
+        )
+
+    if count > 0:
+        click.echo(click.style("Detected JavaScript interactions", fg="blue"))
+        click.echo(f"  Inlining {count} plain JavaScript interaction(s)")
+
+    return "\n".join(new_lines), count
+
+
+def parse_r_code(content: str, course_source_dir: Path | None = None) -> tuple[str, int]:
     """
     Detect 'R Code' sections and wrap subsequent lines into executable
     Quarto fenced R code blocks.
@@ -1067,6 +1277,15 @@ def parse_r_code(content: str) -> tuple[str, int]:
     Alt :: Description of generated figure
     Caption :: Visible figure caption
     <R code>
+    END R Code
+
+    External code may be supplied instead of inline code:
+
+    R Code
+    Source :: code/example.R
+    Mode :: static
+    Echo :: true
+    Output :: true
     END R Code
 
     R Mode options:
@@ -1092,6 +1311,7 @@ def parse_r_code(content: str) -> tuple[str, int]:
     r_mode = "static"
     echo = "true"
     output = "true"
+    source = ""
 
     def escape_chunk_option_text(text: str) -> str:
         return text.replace("\\", "\\\\").replace('"', '\\"')
@@ -1105,9 +1325,28 @@ def parse_r_code(content: str) -> tuple[str, int]:
         return default
 
     def flush_code_block():
-        nonlocal code_lines, new_lines, fig_alt, fig_cap, r_mode, echo, output
+        nonlocal code_lines, new_lines, fig_alt, fig_cap, r_mode, echo, output, source
 
-        cleaned_code = clean_r_code("\n".join(code_lines))
+        inline_code = clean_r_code("\n".join(code_lines))
+        if source:
+            if inline_code:
+                raise ValueError(
+                    "R Code cannot contain both Source :: and inline R code."
+                )
+            if course_source_dir is None:
+                raise ValueError(
+                    "An R Code Source :: requires the course configuration directory."
+                )
+            cleaned_code = clean_r_code(
+                resolve_r_code_source(source, course_source_dir)
+            )
+        else:
+            cleaned_code = inline_code
+
+        if not cleaned_code:
+            raise ValueError(
+                "R Code requires either Source :: or inline R code."
+            )
         chunk_engine = "webr-r" if r_mode.lower() == "webr" else "r"
         echo_value = normalize_bool(echo, default="true")
         output_value = normalize_bool(output, default="true")
@@ -1140,6 +1379,7 @@ def parse_r_code(content: str) -> tuple[str, int]:
         r_mode = "static"
         echo = "true"
         output = "true"
+        source = ""
 
     for line in lines:
         stripped = line.strip()
@@ -1154,6 +1394,7 @@ def parse_r_code(content: str) -> tuple[str, int]:
                 r_mode = "static"
                 echo = "true"
                 output = "true"
+                source = ""
                 continue
             else:
                 new_lines.append(line)
@@ -1172,7 +1413,8 @@ def parse_r_code(content: str) -> tuple[str, int]:
                 new_lines.append(line)
                 in_code_block = False
             else:
-                mode_match = re.match(r"^R Mode\s*::\s*(.*)$", stripped, re.IGNORECASE)
+                mode_match = re.match(r"^(?:R\s+)?Mode\s*::\s*(.*)$", stripped, re.IGNORECASE)
+                source_match = re.match(r"^Source\s*::\s*(.*)$", stripped, re.IGNORECASE)
                 echo_match = re.match(r"^Echo\s*::\s*(.*)$", stripped, re.IGNORECASE)
                 output_match = re.match(r"^Output\s*::\s*(.*)$", stripped, re.IGNORECASE)
                 alt_match = re.match(r"^Alt\s*::\s*(.*)$", stripped, re.IGNORECASE)
@@ -1180,6 +1422,8 @@ def parse_r_code(content: str) -> tuple[str, int]:
 
                 if mode_match:
                     r_mode = mode_match.group(1).strip().rstrip("\\").strip().lower()
+                elif source_match:
+                    source = source_match.group(1).strip().rstrip("\\").strip()
                 elif echo_match:
                     echo = echo_match.group(1).strip().rstrip("\\").strip().lower()
                 elif output_match:
@@ -2391,7 +2635,12 @@ def parse_embeds(content: str) -> tuple[str, int]:
     return "\n".join(new_lines), count
 
 
-def parse_interactions(content: str, qmd_path: Path, course_dir: Path) -> str:
+def parse_interactions(
+    content: str,
+    qmd_path: Path,
+    course_dir: Path,
+    course_source_dir: Path | None = None,
+) -> str:
     """Coordinator function for parsing supported interaction types."""
     total_interactions = 0
 
@@ -2404,7 +2653,13 @@ def parse_interactions(content: str, qmd_path: Path, course_dir: Path) -> str:
     content, count = parse_r_example(content)
     total_interactions += count
 
-    content, count = parse_r_code(content)
+    content, count = parse_r_code(content, course_source_dir=course_source_dir)
+    total_interactions += count
+
+    content, count = parse_javascript_interactions(
+        content,
+        course_source_dir=course_source_dir,
+    )
     total_interactions += count
 
     content, count = parse_callouts(content)
@@ -2437,7 +2692,12 @@ def parse_interactions(content: str, qmd_path: Path, course_dir: Path) -> str:
     return content
 
 
-def insert_markdown_into_qmd(md_path: Path, qmd_path: Path, course_dir: Path):
+def insert_markdown_into_qmd(
+    md_path: Path,
+    qmd_path: Path,
+    course_dir: Path,
+    course_source_dir: Path | None = None,
+):
     """
     Inserts Markdown content into a QMD file.
     - Creates a .bak backup.
@@ -2459,7 +2719,12 @@ def insert_markdown_into_qmd(md_path: Path, qmd_path: Path, course_dir: Path):
 
     imported_content = apply_following_alt_text_to_images(imported_content)
 
-    imported_content = parse_interactions(imported_content, qmd_path, course_dir).strip()
+    imported_content = parse_interactions(
+        imported_content,
+        qmd_path,
+        course_dir,
+        course_source_dir=course_source_dir,
+    ).strip()
 
     imported_content = re.sub(r"^\s*#\s+[^\n]*\n*", "", imported_content, count=1)
     imported_content = re.sub(r"^\s*Title:\s*[^\n]*\n*", "", imported_content, count=1, flags=re.IGNORECASE)
@@ -2527,13 +2792,11 @@ def run_import(config_path: str):
         return
 
     try:
-        config = ConfigLoader.load(config_path)
+        config_file = Path(config_path).resolve()
+        course_source_dir = config_file.parent
+        config = ConfigLoader.load(str(config_file))
         course_id = config.module.id.lower()
         click.echo(f"Importing Word content for course: {course_id}")
-
-        import_dir = Path("imports") / "courses" / course_id
-        md_dir = import_dir / "md"
-        md_dir.mkdir(parents=True, exist_ok=True)
 
         course_dir = Path("build") / "courses" / course_id
         if not course_dir.exists():
@@ -2547,9 +2810,12 @@ def run_import(config_path: str):
                 return
             course_dir = sorted(options)[-1]
 
+        md_dir = course_dir / "imported" / "md"
+        md_dir.mkdir(parents=True, exist_ok=True)
+
         click.echo(f"Locating target files in: {course_dir}")
 
-        copy_site_resources(course_dir)
+        copy_site_resources(course_source_dir, course_dir)
 
         imported_count = 0
         skipped_count = 0
@@ -2562,7 +2828,19 @@ def run_import(config_path: str):
                 click.echo(click.style(f"Skipping page '{page.id}' (no source_docx)", fg="yellow"))
                 continue
 
-            docx_path = Path(page.source_docx)
+            declared_docx_path = Path(page.source_docx)
+            docx_path = (
+                declared_docx_path
+                if declared_docx_path.is_absolute()
+                else course_source_dir / declared_docx_path
+            ).resolve()
+
+            # Compatibility fallback for older configurations whose paths were
+            # intentionally relative to the project working directory.
+            if not docx_path.exists() and not declared_docx_path.is_absolute():
+                legacy_docx_path = declared_docx_path.resolve()
+                if legacy_docx_path.exists():
+                    docx_path = legacy_docx_path
 
             if not docx_path.exists():
                 skipped_count += 1
@@ -2591,13 +2869,22 @@ def run_import(config_path: str):
             if contains_html_embed_directive(raw_md):
                 html_resources_required = True
 
-            warnings = validate_import_content(raw_md, page.id, project_root=Path("."))
+            warnings = validate_import_content(
+                raw_md,
+                page.id,
+                project_root=course_source_dir,
+            )
             print_validation_warnings(warnings)
 
             target_path = _find_target_qmd(course_dir, page.id)
             if target_path:
                 click.echo(f"Inserting converted content into {target_path}")
-                insert_markdown_into_qmd(md_path, target_path, course_dir)
+                insert_markdown_into_qmd(
+                    md_path,
+                    target_path,
+                    course_dir,
+                    course_source_dir=course_source_dir,
+                )
                 imported_count += 1
             else:
                 skipped_count += 1

@@ -1,109 +1,305 @@
-# Measures and Data in Outbreak Investigations
+## Key Concept
 
-## Introduction
+Callout :: important
 
-Outbreak investigations rely on the careful collection, interpretation, and communication of data. During an outbreak, public health teams must rapidly gather information to understand what is happening, who is affected, how the disease is spreading, and what actions may reduce further transmission. Data provides the foundation for decision-making throughout the investigation process.
+Vaccine effectiveness measures the reduction in disease risk among vaccinated individuals compared to unvaccinated individuals in real-world conditions.
 
-Measures used in outbreak investigations help transform raw observations into meaningful patterns. These measures allow investigators to estimate the scale of the outbreak, compare affected groups, identify potential sources of infection, and evaluate whether control measures are working. Accurate and timely data collection is therefore essential for effective public health action.
+END Callout
 
-In practice, outbreak data may come from many different sources. These include clinical records, laboratory reports, surveillance systems, interviews, questionnaires, environmental assessments, and population statistics. Each source contributes different types of information, and investigators often need to combine these data sources to build a clearer picture of the outbreak.
+## Step-by-Step Calculation
 
-Understanding the strengths and limitations of outbreak data is equally important. Early information is often incomplete, uncertain, or rapidly changing. Investigators must therefore interpret findings cautiously while continuing to refine their understanding as new evidence becomes available.
+Reveal
 
-## Types of Data Used in Outbreak Investigations
+Label :: Show calculation
 
-Outbreak investigations involve both quantitative and qualitative data.
+1.  Calculate risk in the vaccinated group: 5 / 500 = 0.01
 
-Quantitative data includes measurable information such as age, number of cases, dates of symptom onset, laboratory results, hospital admissions, or vaccination status. These data are often used to calculate frequencies, identify trends, and compare groups.
+2.  Calculate risk in the unvaccinated group: 25 / 500 = 0.05
 
-Qualitative data includes descriptive information gathered through interviews, observations, or open-ended responses. For example, investigators may ask individuals about their recent activities, social interactions, travel history, food consumption, or workplace conditions. These descriptions can provide important clues about possible exposures and transmission routes.
+3.  Relative Risk = 0.01 / 0.05 = 0.2
 
-Data can also be classified according to how it is measured.
+4.  VE = (1 − 0.2) × 100 = 80%
 
-Categorical data groups individuals into categories such as sex, occupation, vaccination status, or exposure type. Numerical data involves measurable quantities such as age, duration of illness, or number of contacts.
+END Reveal
 
-Some outbreak data changes over time. Temporal data helps investigators understand when cases occurred and whether the outbreak is growing, stabilising, or declining. Geographic data helps identify where cases are occurring and whether there are spatial clusters or patterns of spread.
+## Pause and Reflect
 
-## Key Measures in Outbreak Epidemiology
+SelfCheck
 
-Several important measures are commonly used during outbreak investigations.
+Question :: Why might vaccine effectiveness differ between populations?
 
-Case counts provide the simplest measure and describe the number of identified cases. Although basic, case counts help establish the size of the outbreak and monitor changes over time.
+Answer :: Differences in exposure, population structure, healthcare access, and underlying health conditions can influence estimates.
 
-Incidence measures describe the occurrence of new cases within a population over a specific period. These measures are particularly useful for understanding the speed of transmission and comparing risk across populations.
+END SelfCheck
 
-Attack rates are commonly used in outbreak settings to estimate the proportion of people who become ill after a particular exposure. These measures are especially useful in foodborne outbreaks, institutional outbreaks, or other situations involving clearly defined populations.
+## Youtube
 
-Secondary attack rates help investigators understand person-to-person transmission by estimating how many susceptible contacts become infected after exposure to a primary case.
+YouTubeEmbed :: https://www.youtube.com/watch?v=yt3e8Ng0mf0
 
-Measures of severity are also important. These may include hospitalisation rates, complication rates, or mortality measures. Such indicators help public health teams assess the impact of the outbreak and prioritise resources.
+## Panopto
 
-Measures related to vaccination may also be used, including vaccine uptake within a population and comparisons between vaccinated and unvaccinated groups. These measures can help assess patterns of protection and identify vulnerable populations.
+PanoptoEmbed :: https://lshtm.cloud.panopto.eu/Panopto/Pages/Viewer.aspx?id=d19ba573-9ad1-480b-95db-b3ed01014aab
 
-## Descriptive Epidemiology
+## 
 
-Descriptive epidemiology forms the early foundation of outbreak investigation. Investigators describe cases according to person, place, and time.
+## R Code Demos  R Code and Output
 
-Person-based analysis examines characteristics such as age, sex, occupation, ethnicity, health status, or vaccination history. Identifying which groups are most affected may provide clues about transmission patterns or risk factors.
+R Code
 
-Place-based analysis focuses on geographic patterns. Cases may cluster within households, schools, workplaces, healthcare facilities, or particular communities. Mapping case locations can help identify hotspots or possible environmental sources.
+R Mode :: static
 
-Time-based analysis examines when cases occur. Tracking symptom onset dates allows investigators to identify trends, estimate exposure periods, and understand the progression of the outbreak.
+Echo :: true
 
-Together, person, place, and time analyses help generate hypotheses about the source and spread of infection. These descriptive approaches often guide further analytical investigations.
+Output :: true
 
-## Data Collection During an Outbreak
+Alt :: Bar chart showing risk of infection for vaccinated and unvaccinated groups.
 
-Data collection during outbreaks must balance speed, accuracy, and practicality.
+Caption :: Risk of Infection by Vaccination Status
 
-Investigators often develop case investigation forms to standardise information gathering. These forms may include demographic information, symptoms, laboratory results, exposure history, travel history, occupation, and contact information.
+group \<- c(\"Vaccinated\", \"Unvaccinated\")
 
-Interviews are a major source of outbreak data. Depending on the outbreak, interviews may be conducted face-to-face, by telephone, online, or through self-administered questionnaires. Consistency in questioning is important to improve data quality and comparability.
+cases \<- c(5, 25)
 
-Laboratory data plays a critical role in confirming diagnoses and identifying pathogens. Laboratory testing may also provide information about variants, antimicrobial resistance, or genetic links between cases.
+population \<- c(500, 500)
 
-Environmental investigations can contribute additional data. Investigators may inspect facilities, collect food or water samples, assess ventilation systems, or review sanitation practices.
+risk \<- cases / population
 
-Data quality is a continual concern during outbreaks. Missing data, inaccurate recall, delayed reporting, and inconsistent definitions can affect interpretation. Public health teams therefore need systems for data validation, cleaning, and ongoing review.
+barplot(
 
-## Case Definitions and Standardisation
+risk,
 
-A clear case definition is essential for consistent data collection.
+names.arg = group,
 
-Case definitions establish criteria for deciding whether an individual should be classified as part of the outbreak. Definitions may include clinical symptoms, laboratory confirmation, epidemiological links, and time or location restrictions.
+col = c(\"steelblue\", \"tomato\"),
 
-Outbreak investigations often use different categories such as suspected, probable, and confirmed cases. These categories allow investigators to capture varying levels of certainty while maintaining structured surveillance.
+main = \"Risk of Infection by Vaccination Status\"
 
-Standardisation improves comparability across teams, regions, and reporting systems. Without consistent definitions and procedures, it becomes difficult to compare findings or accurately assess trends.
+)
 
-Case definitions may evolve during the outbreak as more information becomes available. Early definitions are often broader to maximise case detection, while later definitions may become more specific as understanding improves.
+END R Code
 
-## Interpreting Outbreak Data
+## R Code Only
 
-Interpreting outbreak data requires caution and critical thinking.
+R Code
 
-Early outbreak data is frequently incomplete and subject to bias. Some individuals may not seek healthcare, testing capacity may be limited, or reporting systems may lag behind real-world events. As a result, initial estimates may underrepresent the true scale of the outbreak.
+R Mode :: static
 
-Changes in testing practices or surveillance intensity can also affect apparent trends. An increase in reported cases may reflect improved detection rather than true increases in transmission.
+Echo :: true
 
-Investigators must consider possible sources of bias and confounding when interpreting findings. For example, certain groups may be more likely to be tested or reported, creating misleading patterns.
+Output :: false
 
-Uncertainty is an inherent part of outbreak investigation. Public health decisions often need to be made before all evidence is available. Transparent communication about uncertainty is therefore important for maintaining trust and supporting informed decision-making.
+group \<- c(\"Vaccinated\", \"Unvaccinated\")
 
-## Ethical Considerations in Outbreak Data
+cases \<- c(5, 25)
 
-Outbreak investigations involve sensitive personal and health information. Ethical and legal responsibilities are therefore central to data collection and management.
+population \<- c(500, 500)
 
-Confidentiality must be protected when handling identifiable information. Access to sensitive data should be limited to authorised personnel, and secure systems should be used for storage and communication.
+risk \<- cases / population
 
-Investigators must also consider fairness and equity. Some populations may face greater risks during outbreaks due to social, economic, occupational, or environmental factors. Data analysis should therefore consider broader determinants of health and avoid reinforcing stigma or discrimination.
+barplot(
 
-Communication of outbreak findings must balance transparency with privacy. Public health authorities need to provide clear information to support public action while protecting individuals from unnecessary harm or identification.
+risk,
 
-## Conclusion
+names.arg = group,
 
-Measures and data form the core of outbreak investigation and public health response. Through systematic data collection and analysis, investigators can identify patterns of disease transmission, estimate risks, assess severity, and guide interventions.
+col = c(\"steelblue\", \"tomato\"),
 
-Effective outbreak epidemiology depends not only on technical measures but also on data quality, critical interpretation, ethical practice, and clear communication. As outbreaks evolve, data systems and analytical approaches must remain flexible, responsive, and transparent.
+main = \"Risk of Infection by Vaccination Status\"
 
-Understanding how outbreak measures are generated and interpreted is essential for anyone involved in epidemiology, public health, healthcare, or health research.
+)
+
+END R Code
+
+## R Output Only
+
+R Code
+
+R Mode :: static
+
+Echo :: false
+
+Output :: true
+
+Alt :: Bar chart comparing infection risk between vaccinated and unvaccinated groups.
+
+Caption :: Risk of infection by vaccination status
+
+group \<- c(\"Vaccinated\", \"Unvaccinated\")
+
+cases \<- c(5, 25)
+
+population \<- c(500, 500)
+
+risk \<- cases / population
+
+barplot(
+
+risk,
+
+names.arg = group,
+
+col = c(\"steelblue\", \"tomato\"),
+
+main = \"Risk of Infection by Vaccination Status\"
+
+)
+
+END R Code
+
+## Interactive R Code
+
+R Code
+
+R Mode :: webr
+
+Echo :: true
+
+Output :: true
+
+Alt :: Epidemic curve showing daily outbreak case counts.
+
+Caption :: Simulated Epidemic Curve
+
+days \<- 1:10
+
+cases \<- c(2, 4, 7, 12, 18, 15, 11, 7, 4, 2)
+
+barplot(
+
+cases,
+
+names.arg = days,
+
+col = \"steelblue\",
+
+xlab = \"Day\",
+
+ylab = \"Number of Cases\",
+
+main = \"Simulated Epidemic Curve\"
+
+)
+
+END R Code
+
+## R Code Table example
+
+R Code
+
+R Mode :: webr
+
+Echo :: true
+
+Output :: true
+
+data \<- data.frame(
+
+Group = c(\"Vaccinated\", \"Unvaccinated\"),
+
+Cases = c(5, 25),
+
+Population = c(500, 500)
+
+)
+
+data\$Risk \<- data\$Cases / data\$Population
+
+data
+
+END R Code
+
+## Interpreting the Results
+
+Tabs
+
+Tab :: Interpretation
+
+An 80% vaccine effectiveness means vaccinated individuals have substantially lower risk compared to unvaccinated individuals.
+
+END Tab
+
+Tab :: Assumptions
+
+The calculation assumes both groups are comparable and equally exposed.
+
+END Tab
+
+Tab :: Limitations
+
+Confounding factors such as age, immunity, or healthcare access may influence results.
+
+END Tab
+
+END Tabs
+
+## Epidemic Curve
+
+Image :: resources/images/epidemic-curve.png
+
+Alt :: Epidemic curve showing number of measles cases over time by vaccination status
+
+Caption :: Epidemic curve comparing vaccinated and unvaccinated groups.
+
+Width :: 70%
+
+END Image
+
+## Outbreak Report
+
+File :: resources/pdf/outbreak-report.pdf
+
+Display :: embed
+
+Label :: View full outbreak investigation report
+
+END File
+
+## Download Dataset
+
+File :: resources/data/outbreak-dataset.zip
+
+Label :: Download full dataset
+
+END File
+
+## Quiz
+
+Question :: Based on the outbreak data, what does a vaccine effectiveness of 80% mean in practice?
+
+Option :: Vaccinated individuals have zero risk of infection
+
+Option :: Vaccinated individuals have an 80% lower risk of infection than unvaccinated individuals
+
+Option :: 80% of vaccinated individuals will not become infected
+
+Option :: The vaccine prevents 80 cases in every outbreak regardless of context
+
+Answer :: Vaccinated individuals have an 80% lower risk of infection than unvaccinated individuals
+
+Explanation :: Vaccine effectiveness compares the risk of disease in vaccinated and unvaccinated groups under real-world conditions. An 80% VE means the vaccinated group experienced substantially lower risk, not that infection risk was eliminated entirely.
+
+END Quiz
+
+## 
+
+## Key Takeaway
+
+Callout :: tip
+
+Vaccination significantly reduces the likelihood of infection and severe disease, even if it does not eliminate risk entirely.
+
+END Callout
+
+## Binomial Theorem equation
+
+$$(x + a)^{n} = \sum_{k = 0}^{n}{\binom{n}{k}x^{k}a^{n - k}}$$
+
+## Latex Equations Approach
+
+**Display equation example**
+
+\$\$\
+P(X=x)=\\binom{n}{x}p\^x(1-p)\^{n-x}\
+\$\$
+
+## 

@@ -10,10 +10,28 @@ from .interaction_resolver import InteractionResolver
 from .page_kind_resolver import PageKindResolver
 
 class Generator:
-    def __init__(self, config: CourseConfig, output_dir: str, templates_dir: str):
+    def __init__(
+        self,
+        config: CourseConfig,
+        output_dir: str,
+        templates_dir: str,
+        course_source_dir: Optional[str] = None,
+    ):
+        """Create a course generator.
+
+        ``course_source_dir`` is the directory containing ``course.yml``.  It
+        is used as the base for course-relative paths such as
+        ``resources/data/example.csv``.  The argument is optional so existing
+        callers continue to work; when omitted, the generator first looks for
+        source-directory metadata attached by a config loader and finally
+        falls back to the current working directory (the legacy behaviour).
+        """
         self.config = config
-        self.output_dir = Path(output_dir)
-        self.templates_dir = Path(templates_dir)
+        self.output_dir = Path(output_dir).resolve()
+        self.templates_dir = Path(templates_dir).resolve()
+        self.course_source_dir = self._resolve_course_source_dir(
+            config, course_source_dir
+        )
         self.template_manager = TemplateManager(str(self.templates_dir))
         
         # Instantiate interaction resolver pointing to templates/interactions
@@ -29,6 +47,43 @@ class Generator:
             with open(defaults_path, 'r') as f:
                 self.block_defaults = yaml.safe_load(f) or {}
         self.existing_files: Dict[str, Path] = {}
+
+    @staticmethod
+    def _resolve_course_source_dir(
+        config: CourseConfig, course_source_dir: Optional[str]
+    ) -> Path:
+        """Return the stable base directory for paths declared by a course."""
+        if course_source_dir:
+            return Path(course_source_dir).expanduser().resolve()
+
+        # Permit ConfigLoader to retain the source location without coupling
+        # Generator to one specific model implementation.  Both names are
+        # accepted to make a later ConfigLoader update straightforward.
+        for attribute in ("course_source_dir", "_course_source_dir"):
+            value = getattr(config, attribute, None)
+            if value:
+                return Path(value).expanduser().resolve()
+
+        return Path.cwd().resolve()
+
+    def _resolve_course_path(self, value: str) -> Path:
+        """Resolve a YAML path relative to the course folder.
+
+        Absolute paths remain supported for backwards compatibility.  A
+        relative path is not allowed to escape the course folder.
+        """
+        raw_path = Path(value).expanduser()
+        if raw_path.is_absolute():
+            return raw_path.resolve()
+
+        resolved = (self.course_source_dir / raw_path).resolve()
+        try:
+            resolved.relative_to(self.course_source_dir)
+        except ValueError as exc:
+            raise ValueError(
+                f"Course path escapes the course folder: {value}"
+            ) from exc
+        return resolved
 
     def _scan_existing_ids(self):
         """Walk the output directory and map IDs to file paths."""
@@ -442,8 +497,9 @@ class Generator:
     def _handle_resources(self, page, target_path: Path) -> str:
         """
         Processes resources for a page:
-        1. Copies files from root 'resources/' to '<target_dir>/files/'.
-        2. Renders a resource block partial and returns the context.
+        1. Resolves relative files from the folder containing course.yml.
+        2. Copies them to '<target_dir>/files/'.
+        3. Renders a resource block partial and returns the context.
         """
         if not hasattr(page, 'resources') or not page.resources:
             return ""
@@ -453,13 +509,22 @@ class Generator:
         
         remapped_resources = []
         for res in page.resources:
-            source_path = Path(res.file)
-            if not source_path.exists():
-                print(f"Warning: Resource file {source_path} not found. Skipping.")
+            try:
+                source_path = self._resolve_course_path(res.file)
+            except ValueError as exc:
+                print(f"Warning: {exc}. Skipping resource.")
+                continue
+
+            if not source_path.is_file():
+                print(
+                    f"Warning: Resource file {res.file} not found under "
+                    f"{self.course_source_dir}. Skipping."
+                )
                 continue
             
             # Copy file to local 'files/' directory
             dest_path = target_files_dir / res.output_file
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, dest_path)
             
             # Record for context (path relative to the .qmd)

@@ -4,13 +4,13 @@ An outbreak of **measles**, a highly contagious viral disease, occurred in a sem
 
 Public health teams initiated an outbreak investigation to:
 
-- identify confirmed and suspected cases
+1.  identify confirmed and suspected cases
 
-- determine vaccination status
+2.  determine vaccination status
 
-- assess transmission patterns
+3.  assess transmission patterns
 
-- estimate the **real-world effectiveness of the vaccine**
+4.  estimate the **real-world effectiveness of the vaccine**
 
 For an overview of measles epidemiology, see:\
 <https://www.who.int/news-room/fact-sheets/detail/measles>
@@ -21,13 +21,13 @@ Vaccine effectiveness (VE) refers to how well a vaccine performs in real-world c
 
 Unlike vaccine efficacy, effectiveness reflects:
 
-- population diversity
+1.  population diversity
 
-- variation in exposure
+2.  variation in exposure
 
-- real-world healthcare access
+3.  real-world healthcare access
 
-- behavioural factors
+4.  behavioural factors
 
 👉 Learn more:\
 <https://www.who.int/news-room/feature-stories/detail/vaccine-efficacy-effectiveness-and-protection>
@@ -36,13 +36,13 @@ Unlike vaccine efficacy, effectiveness reflects:
 
 Estimating vaccine effectiveness is essential for:
 
-- evaluating vaccination programmes
+1.  evaluating vaccination programmes
 
-- identifying vulnerable populations
+2.  identifying vulnerable populations
 
-- informing outbreak response
+3.  informing outbreak response
 
-- guiding policy decisions
+4.  guiding policy decisions
 
 For further reading:\
 <https://pmc.ncbi.nlm.nih.gov/articles/PMC6734418/>
@@ -51,9 +51,9 @@ For further reading:\
 
 Callout :: important
 
-Text :: Vaccine effectiveness measures the reduction in disease risk among vaccinated individuals compared to unvaccinated individuals in real-world conditions.
+Vaccine effectiveness measures the reduction in disease risk among vaccinated individuals compared to unvaccinated individuals in real-world conditions.
 
-\"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\"
+END Callout
 
 ## Observed Data
 
@@ -77,34 +77,51 @@ VE = (1 − Relative Risk) × 100
 
 ## Step-by-Step Calculation
 
-Reveal\
-Step 1 :: Calculate risk in the vaccinated group: 5 / 500 = 0.01
+Reveal
 
-\"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\"
+Label :: Show calculation
 
-Step 2 :: Calculate risk in the unvaccinated group: 25 / 500 = 0.05\
-Step 3 :: Relative Risk = 0.01 / 0.05 = 0.2\
-Step 4 :: VE = (1 − 0.2) × 100 = 80%
+1.  Calculate risk in the vaccinated group: 5 / 500 = 0.01
+
+2.  Calculate risk in the unvaccinated group: 25 / 500 = 0.05
+
+3.  Relative Risk = 0.01 / 0.05 = 0.2
+
+4.  VE = (1 − 0.2) × 100 = 80%
+
+END Reveal
 
 ## Pause and Reflect
 
-SelfCheck\
-Question :: Why might vaccine effectiveness differ between populations?\
-Answer :: Differences in exposure, population structure, healthcare access, and underlying health conditions can influence estimates.\
-\
-\"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\"
+SelfCheck
+
+Question :: Why might vaccine effectiveness differ between populations?
+
+Answer :: Differences in exposure, population structure, healthcare access, and underlying health conditions can influence estimates.
+
+END SelfCheck
+
+## Plotly Data visualistion
+
+HTML Embed :: resources/html/steph1_plotly_distribution_demo_standalone.html
+
+Title :: Distribution Explorer: Health-Related Measures
+
+Height :: 750
+
+END HTML Embed
 
 ## Youtube
 
 YouTubeEmbed :: https://www.youtube.com/watch?v=yt3e8Ng0mf0
 
-## Panopto
+## 
 
-PanoptoEmbed :: https://lshtm.cloud.panopto.eu/Panopto/Pages/Viewer.aspx?id=d19ba573-9ad1-480b-95db-b3ed01014aab
+## R Code Demos
 
 ## 
 
-## R Code Demos  R Code and Output
+## R Code and Output
 
 R Code
 
@@ -272,53 +289,363 @@ END R Code
 
 ## Interpreting the Results
 
-Tabs\
-Interpretation :: An 80% vaccine effectiveness means vaccinated individuals have substantially lower risk compared to unvaccinated individuals.\
-\
-\
-Assumptions :: The calculation assumes both groups are comparable and equally exposed.\
-Limitations :: Confounding factors such as age, immunity, or healthcare access may influence results.
+Tabs
+
+Tab :: Interpretation
+
+An 80% vaccine effectiveness means vaccinated individuals have substantially lower risk compared to unvaccinated individuals.
+
+END Tab
+
+Tab :: Assumptions
+
+The calculation assumes both groups are comparable and equally exposed.
+
+END Tab
+
+Tab :: Limitations
+
+Confounding factors such as age, immunity, or healthcare access may influence results.
+
+END Tab
+
+END Tabs
 
 ## Epidemic Curve
 
-Image :: resources/images/epidemic-curve.png\
-Alt :: Epidemic curve showing number of measles cases over time by vaccination status\
-Caption :: Epidemic curve comparing vaccinated and unvaccinated groups.\
+Image :: resources/images/epidemic-curve.png
+
+Alt :: Epidemic curve showing number of measles cases over time by vaccination status
+
+Caption :: Epidemic curve comparing vaccinated and unvaccinated groups.
+
 Width :: 70%
+
+END Image
 
 ## Outbreak Report
 
-File :: resources/pdf/outbreak-report.pdf\
-Display :: embed\
+File :: resources/pdf/outbreak-report.pdf
+
+Display :: embed
+
 Label :: View full outbreak investigation report
+
+END File
 
 ## Download Dataset
 
-File :: resources/data/outbreak-dataset.zip\
+File :: resources/data/outbreak-dataset.zip
+
 Label :: Download full dataset
 
-## Quiz
+END File
 
-Question :: Based on the outbreak data, what does a vaccine effectiveness of 80% mean in practice?
+## Single Quiz
 
-Option :: Vaccinated individuals have zero risk of infection
+Quiz
 
-Option :: Vaccinated individuals have an 80% lower risk of infection than unvaccinated individuals
+Type :: single
 
-Option :: 80% of vaccinated individuals will not become infected
+Question :: Which R code correctly identifies patients with systolic blood pressure greater than or equal to 140 mmHg?
 
-Option :: The vaccine prevents 80 cases in every outbreak regardless of context
+Option
 
-Answer :: Vaccinated individuals have an 80% lower risk of infection than unvaccinated individuals
+Correct :: yes
 
-Explanation :: Vaccine effectiveness compares the risk of disease in vaccinated and unvaccinated groups under real-world conditions. An 80% VE means the vaccinated group experienced substantially lower risk, not that infection risk was eliminated entirely.
+The following code uses dplyr and the correct comparison operator:
 
-## 
+R Example
+
+R Mode :: static
+
+Echo :: true
+
+Output :: false
+
+patients \|\>
+
+dplyr::filter(systolic_bp \>= 140)
+
+END R Example
+
+Feedback :: Correct. The \>= operator retains patients with systolic blood pressure equal to or above 140 mmHg.
+
+This includes a reading of exactly 140.
+
+END Option
+
+Option
+
+Correct :: no
+
+The following code selects values below 140:
+
+R Example
+
+R Mode :: static
+
+Echo :: true
+
+Output :: false
+
+patients \|\>
+
+dplyr::filter(systolic_bp \< 140)
+
+END R Example
+
+Feedback :: Not quite. The \< operator selects patients below the threshold rather than those at or above it.
+
+END Option
+
+Option
+
+Correct :: no
+
+The following code only selects readings above 140:
+
+R Example
+
+R Mode :: static
+
+Echo :: true
+
+Output :: false
+
+patients \|\>
+
+dplyr::filter(systolic_bp \> 140)
+
+END R Example
+
+Feedback :: Not quite. This excludes patients whose systolic blood pressure is exactly 140 mmHg.
+
+END Option
+
+Hint :: Look for the operator that means greater than or equal to.
+
+Explanation :: The correct expression is systolic_bp \>= 140.
+
+The \>= operator includes values greater than 140 and values equal to 140. This makes it appropriate when 140 mmHg is part of the threshold.
+
+END Quiz
+
+## Single Quiz
+
+Quiz
+
+Type :: single
+
+Question :: Which expression correctly calculates vaccine effectiveness from a risk ratio?
+
+Option
+
+Correct :: yes
+
+Vaccine effectiveness is calculated as:
+
+\$\$
+
+VE = (1-RR)\\times 100
+
+\$\$
+
+where \\(RR\\) is the risk ratio comparing vaccinated and unvaccinated groups.
+
+Feedback :: Correct. Vaccine effectiveness represents the proportional reduction in risk associated with vaccination.
+
+For example, if \\(RR=0.30\\), then \\(VE=70\\%\\).
+
+END Option
+
+Option
+
+Correct :: no
+
+Vaccine effectiveness is the risk ratio multiplied by 100:
+
+\$\$
+
+VE = RR\\times 100
+
+\$\$
+
+Feedback :: Not quite. This converts the risk ratio into a percentage but does not calculate the reduction in risk.
+
+END Option
+
+Option
+
+Correct :: no
+
+Vaccine effectiveness is calculated by subtracting the risk ratio from 100:
+
+\$\$
+
+VE = 100-RR
+
+\$\$
+
+Feedback :: Not quite. The risk ratio is normally expressed as a proportion and must first be subtracted from 1.
+
+END Option
+
+Hint :: Vaccine effectiveness measures the proportional reduction in risk among vaccinated people.
+
+Explanation :: The correct formula is:
+
+\$\$
+
+VE = (1-RR)\\times 100
+
+\$\$
+
+If the risk ratio is \\(0.30\\), the calculation is:
+
+\$\$
+
+VE = (1-0.30)\\times 100 = 70\\%
+
+\$\$
+
+This indicates that vaccination is associated with a 70% reduction in risk.
+
+END Quiz
+
+## Single Quiz
+
+Simple Single-Select Quiz
+
+Quiz
+
+Question :: Which expression correctly calculates vaccine effectiveness?
+
+Option :: VE = (1 − RR) × 100
+
+Option :: VE = RR × 100
+
+Option :: VE = 100 − RR
+
+Answer :: VE = (1 − RR) × 100
+
+Hint :: Vaccine effectiveness measures the proportional reduction in risk.
+
+Explanation :: The correct formula is VE = (1 − RR) × 100.
+
+END Quiz
+
+## Multiple Quiz
+
+Quiz
+
+Type :: multiple
+
+Question :: Which R expressions would retain a patient whose systolic blood pressure is exactly 140 mmHg?
+
+Option
+
+Correct :: yes
+
+R Example
+
+R Mode :: static
+
+Echo :: true
+
+Output :: false
+
+patients \|\>
+
+dplyr::filter(systolic_bp \>= 140)
+
+END R Example
+
+Feedback :: Correct. The \>= operator includes 140.
+
+END Option
+
+Option
+
+Correct :: yes
+
+R Example
+
+R Mode :: static
+
+Echo :: true
+
+Output :: false
+
+patients \|\>
+
+dplyr::filter(systolic_bp == 140)
+
+END R Example
+
+Feedback :: Correct. The == operator selects readings that are exactly 140.
+
+END Option
+
+Option
+
+Correct :: no
+
+R Example
+
+R Mode :: static
+
+Echo :: true
+
+Output :: false
+
+patients \|\>
+
+dplyr::filter(systolic_bp \> 140)
+
+END R Example
+
+Feedback :: This excludes 140 because it only accepts values greater than 140.
+
+END Option
+
+Option
+
+Correct :: no
+
+R Example
+
+R Mode :: static
+
+Echo :: true
+
+Output :: false
+
+patients \|\>
+
+dplyr::filter(systolic_bp \< 140)
+
+END R Example
+
+Feedback :: This selects readings below 140.
+
+END Option
+
+Hint :: More than one expression can include a reading of exactly 140.
+
+Explanation :: Both \>= 140 and == 140 retain a value of exactly 140.
+
+However, they have different meanings: \>= 140 also includes higher readings, while == 140 only includes readings equal to 140.
+
+END Quiz
 
 ## Key Takeaway
 
-Callout :: tip\
-Text :: Vaccination significantly reduces the likelihood of infection and severe disease, even if it does not eliminate risk entirely.
+Callout :: tip
+
+Vaccination significantly reduces the likelihood of infection and severe disease, even if it does not eliminate risk entirely.
+
+END Callout
 
 ## Binomial Theorem equation
 

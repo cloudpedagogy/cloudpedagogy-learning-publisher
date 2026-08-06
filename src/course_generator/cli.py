@@ -95,8 +95,8 @@ def _get_versioned_path(path_str):
     "--versioned/--no-versioned",
     "versioning",
     is_flag=True,
-    default=True,
-    help="Use versioned folder, for example _v1, if target exists.",
+    default=False,
+    help="Use a versioned build folder, for example _v1. Disabled by default so build and import-word use the same working folder.",
 )
 def build(config_path, output_dir, render_mode, templates_dir, force, versioning):
     """
@@ -139,7 +139,12 @@ def build(config_path, output_dir, render_mode, templates_dir, force, versioning
         if versioning:
             output_dir = _get_versioned_path(output_dir)
 
-        generator = Generator(config, output_dir, templates_dir)
+        generator = Generator(
+            config,
+            output_dir,
+            templates_dir,
+            course_source_dir=Path(config_dir),
+        )
         generator.build(force=force, global_render_mode=render_mode)
 
         click.echo(click.style(f"Successfully generated course scaffold in {output_dir}", fg="green"))
@@ -274,7 +279,13 @@ def build_all(config_dir, force, no_version):
             if not no_version:
                 output_dir = _get_versioned_path(output_dir)
 
-            generator = Generator(config, output_dir, "templates")
+            course_source_dir = Path(path).resolve().parent
+            generator = Generator(
+                config,
+                output_dir,
+                "templates",
+                course_source_dir=course_source_dir,
+            )
             generator.build(force=force)
 
         click.echo(click.style("✅ All courses built successfully.", fg="green"))
