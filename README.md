@@ -14,6 +14,12 @@ Depending on the course configuration, Learning Publisher can create:
 - Images, downloadable files, video and standalone HTML embeds
 - Self-contained JavaScript interactions supplied as one `.js` file
 
+## Live demo
+
+[Open the Outbreak Investigation and Vaccine Effectiveness demo](http://cloudpedagogy-learning-publisher.s3-website.eu-west-2.amazonaws.com/outbreak_ve_demo/se01/OUTBREAK_VE_DEMO-se01-sec01-sp01.html)
+
+[![Screenshot of the Learning Publisher outbreak and vaccine effectiveness demo](img/screenshot.png)](http://cloudpedagogy-learning-publisher.s3-website.eu-west-2.amazonaws.com/outbreak_ve_demo/se01/OUTBREAK_VE_DEMO-se01-sec01-sp01.html)
+
 ## Publishing workflow
 
 ```text
