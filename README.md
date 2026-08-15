@@ -184,8 +184,13 @@ Learning Publisher supports reveals, self-checks, callouts, tabs, quizzes,
 static R and WebR content, plain JavaScript interactions, images, downloadable
 resources, video and standalone HTML activities.
 
-For the complete Word conventions, directive syntax, examples, accessibility
-guidance and troubleshooting, see the
+## Documentation
+
+For complete guidance to installing, configuring, authoring, building,
+publishing and maintaining Learning Publisher courses, see the
+[Learning Publisher Handbook](HANDBOOK.md).
+
+For detailed Word authoring conventions, directive syntax and examples, see the
 [Learning Publisher Authoring Guide](docs/AUTHORING_GUIDE.md).
 
 ## Project structure
