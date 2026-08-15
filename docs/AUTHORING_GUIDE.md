@@ -1,6 +1,8 @@
 # Learning Publisher Authoring Guide
 
-This guide explains how to create and maintain Word-first courses with CloudPedagogy Learning Publisher. It is intended for course authors, learning technologists and reviewers. Repository installation and developer information remain in `README.md`.
+This guide explains how to create and maintain Word-first course content with CloudPedagogy Learning Publisher. It is intended primarily for course authors, learning designers, learning technologists and reviewers preparing source content in Microsoft Word.
+
+For installation, the complete publishing workflow, command-line operation, quality assurance, troubleshooting, Git, VM operation, deployment and platform maintenance, see the **Learning Publisher Operating Handbook** (`docs/OPERATING_HANDBOOK.md`). For a short project overview and installation quick start, see the repository `README.md`.
 
 ## 1. Authoring model
 
@@ -30,28 +32,13 @@ Treat the Word documents and files in the course folder as source material. File
 
 1. Edit the appropriate `.docx` file in the course's `docx/` folder.
 2. Add or update any referenced files under `code/` or `resources/`.
-3. Accept or reject tracked changes before publishing a completed version.
+3. Accept or reject tracked changes before treating a Word document as complete.
 4. Save and close Word. Remove temporary Word lock files whose names begin with `~$`.
-5. Run the publishing commands from the repository root.
-6. Review the website and, where relevant, the Word and PDF handbook outputs.
+5. Submit the source for publishing, or, if you are also the publishing operator, follow the **Learning Publisher Operating Handbook** for the current validation, build, import, handbook and rendering workflow.
+6. Review the generated website and, where relevant, the Word and PDF handbook outputs.
+7. Make content corrections in the maintained Word/source files and regenerate the publication rather than editing generated QMD or HTML as the master copy.
 
-```bash
-source .venv/bin/activate
-
-python -m course_generator.cli validate imports/courses/my_course/course.yml
-python -m course_generator.cli build imports/courses/my_course/course.yml
-python -m course_generator.cli import-word imports/courses/my_course/course.yml
-python src/course_generator/tools/build_handbook_from_quarto.py build/courses/my_course
-python -m course_generator.cli render imports/courses/my_course/course.yml --no-versioned
-```
-
-Replace `my_course` with the course folder name. On macOS, open the result with:
-
-```bash
-open output/courses/my_course/index.html
-```
-
-Run `build` before `import-word`. After changing Word, R, JavaScript or resources, rerun `import-word`, the handbook step and `render`.
+The course authoring source remains under `imports/courses/<course_name>/`. Files under `build/` and `output/` are generated publication material.
 
 ## 3. Word document structure
 
@@ -427,33 +414,24 @@ Before marking a page complete, confirm that:
 
 Accessibility should be checked in the rendered outputs, not only in Word.
 
-## 15. Review and quality assurance
+## 15. Author review and quality assurance
 
-Review at least the following after every substantive import:
+After a substantive content update, authors and reviewers should check the generated publication for:
 
-1. Navigation, titles and page order.
-2. Headings, lists, tables and links.
-3. Images, downloads and embedded media.
-4. Every reveal, self-check, tab and quiz.
-5. R code, figures, tables and WebR controls.
-6. JavaScript interactions at desktop and narrow screen widths.
-7. The combined handbook, especially page breaks and interaction fallbacks.
-8. Importer warnings shown in Terminal.
+1. Correct titles, page order and academic content.
+2. Heading structure, lists, tables and links.
+3. Images, captions, alternative text, downloads and embedded media.
+4. Every reveal, self-check, tab and quiz used in the edited material.
+5. R examples, figures, tables and WebR activities where relevant.
+6. JavaScript or HTML interactions where relevant.
+7. The combined handbook, particularly whether interactive material has a useful static representation.
+8. Any content-related warnings reported by the publishing operator.
 
-Use tracked changes during review, but accept/reject all changes before treating a Word file as complete. Reimport after any accepted correction.
+Use tracked changes and comments during review where appropriate, but resolve tracked changes before treating the source Word file as complete. Reimport after accepted corrections.
 
-## 16. Troubleshooting
+Detailed technical QA, render diagnostics and deployment checks are covered in the **Learning Publisher Operating Handbook**.
 
-### The virtual environment cannot be activated
-
-If `.venv/bin/activate` does not exist, perform the one-time setup from the repository root:
-
-```bash
-python3.13 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
+## 16. Authoring troubleshooting
 
 ### A directive appears as ordinary text
 
@@ -463,68 +441,44 @@ Check that:
 - `::` uses two colons;
 - the opening keyword is spelled correctly;
 - the block has the correct `END ...` line; and
-- the document was saved before `import-word` was rerun.
+- the Word document was saved before it was submitted or reimported.
 
 ### An external source file is not found
 
-Paths are relative to the course folder, not the repository root or Word document. For example:
+Paths are relative to the course folder, not the repository root or the Word document. For example:
 
 ```text
 Source :: code/example.R
 ```
 
-Confirm the filename, extension and letter case. Absolute paths and paths outside the course folder are rejected.
+Confirm the filename, extension and letter case. Absolute paths and paths outside the course folder are not appropriate.
 
-### Changes do not appear in the website
+### A correction does not appear in the publication
 
-Rerun the full authoring cycle:
+Confirm that:
 
-```bash
-python -m course_generator.cli build imports/courses/my_course/course.yml
-python -m course_generator.cli import-word imports/courses/my_course/course.yml
-python src/course_generator/tools/build_handbook_from_quarto.py build/courses/my_course
-python -m course_generator.cli render imports/courses/my_course/course.yml --no-versioned
-```
+1. the correct source Word document was edited;
+2. the document was saved and closed;
+3. the publishing operator reran the required import and rendering stages; and
+4. you are reviewing the newly generated publication rather than an older browser tab or release.
 
-Then refresh the browser. If necessary, close the old page and reopen `output/courses/my_course/index.html`.
+For command-line errors, virtual-environment problems, PDF/TinyTeX failures, rendering failures and deployment issues, see the **Learning Publisher Operating Handbook**.
 
-### PDF rendering fails
+### Word temporary files appear in the course folder
 
-Check that TinyTeX is installed:
+Close Word and remove files beginning with `~$`. These are temporary lock files and are not course source documents.
 
-```bash
-quarto install tinytex
-```
+## 17. Source and handover principles
 
-Also check the first error in the render log; later errors are often consequences of the first one.
+Authors should treat the course-local Word documents, referenced code and resources as maintained source material. Do not edit files under `build/` or `output/` as the master copy.
 
-### Word temporary files are imported accidentally
-
-Close Word and delete files beginning with `~$`. These are temporary lock files and should not be committed.
-
-## 17. Source-control guidance
-
-Normally commit:
-
-- `course.yml`;
-- source `.docx` files;
-- files under `code/` and `resources/`;
-- platform source changes under `src/`; and
-- documentation such as this guide.
-
-Normally ignore:
-
-- `.venv/`;
-- `__pycache__/` and `*.pyc`;
-- Word lock files beginning with `~$`;
-- temporary ZIP downloads; and
-- generated `build/` and `output/` folders, unless the repository intentionally publishes them.
+If you work directly with the Git repository, do not commit temporary Word lock files beginning with `~$`. Detailed Git, branch, generated-file and repository-maintenance guidance is provided in the **Learning Publisher Operating Handbook**.
 
 ## 18. Author handover checklist
 
 Before handing a course to another author or publishing it:
 
-- [ ] `course.yml` validates successfully.
+- [ ] The correct course and source documents have been identified.
 - [ ] All source files are stored inside the course folder.
 - [ ] Word tracked changes have been resolved.
 - [ ] Directive blocks have explicit end markers.
@@ -532,6 +486,6 @@ Before handing a course to another author or publishing it:
 - [ ] Links, downloads and video permissions have been tested.
 - [ ] The website has been reviewed at desktop and narrow widths.
 - [ ] The handbook outputs have been checked.
-- [ ] Import and render warnings have been resolved or documented.
-- [ ] Generated and temporary files are excluded from the commit as intended.
+- [ ] Any content-related warnings raised during publishing have been resolved or documented.
+- [ ] Temporary Word lock files are not included with the source material.
 
