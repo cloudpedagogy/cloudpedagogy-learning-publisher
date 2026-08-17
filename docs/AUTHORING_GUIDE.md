@@ -23,7 +23,7 @@ imports/courses/my_course/
 
 - `course.yml` defines the course hierarchy, titles, identifiers and Word sources.
 - `docx/` contains the editable Word documents.
-- `code/` contains external `.R` and `.js` files referenced from Word.
+- `code/` contains external `.R`, `.py` and `.js` files referenced from Word.
 - `resources/` contains images, downloads, media and standalone HTML activities.
 
 Treat the Word documents and files in the course folder as source material. Files under `build/` and `output/` are generated and should not be edited as the master copy.
@@ -306,7 +306,107 @@ R options:
 
 Static R requires R and the necessary packages on the publishing computer. WebR support depends on the configured Quarto WebR extension.
 
-## 11. Plain JavaScript interactions
+For WebR activities, course-local files referenced with literal `resources/data/...` paths can be staged into the browser runtime. WebR package loading is also handled lazily for common package references such as `library(dplyr)`: the page can load normally, and a missing compatible package is downloaded only when the learner runs code that needs it. The first run of a package-dependent activity may therefore take longer than later runs in the same browser runtime.
+
+## 11. Python and Pyodide content
+
+Learning Publisher also supports Python content through the generic `Code` directive. Python can be shown as static code or executed interactively in the learner's browser using Pyodide.
+
+### Static Python display
+
+Use `Mode :: static` when the code should be displayed but not executed by Learning Publisher:
+
+```text
+Code
+Language :: python
+Mode :: static
+Source :: code/example.py
+END Code
+```
+
+### Interactive Python with Pyodide
+
+Use `Mode :: pyodide` for editable browser-based Python:
+
+```text
+Code
+Language :: python
+Mode :: pyodide
+Source :: code/outbreak-risk-table.py
+END Code
+```
+
+The learner can edit the code, select **Run Python**, and view text, table-like output or captured Matplotlib figures in the page.
+
+Short inline Python is also supported:
+
+```text
+Code
+Language :: python
+Mode :: pyodide
+
+numbers = [2, 4, 6, 8]
+print(sum(numbers) / len(numbers))
+
+END Code
+```
+
+Do not combine `Source ::` with inline Python in the same block.
+
+### Python data files
+
+Course-local data can be staged into Pyodide with one or more `Data ::` lines:
+
+```text
+Code
+Language :: python
+Mode :: pyodide
+Source :: code/outbreak-pandas-example.py
+Data :: resources/data/outbreak-patients.csv
+END Code
+```
+
+A referenced file such as `resources/data/outbreak-patients.csv` is made available to Python under `data/outbreak-patients.csv`. For example:
+
+```python
+import pandas as pd
+
+df = pd.read_csv("data/outbreak-patients.csv")
+print(df.head())
+```
+
+Data paths must remain inside the course folder. Learning Publisher validates and embeds the referenced files for browser-side use.
+
+### Python packages
+
+Pyodide inspects imports in the learner code and loads compatible packages when the activity is run. Tested examples include `matplotlib` and `pandas`.
+
+For example:
+
+```python
+import matplotlib.pyplot as plt
+```
+
+or:
+
+```python
+import pandas as pd
+```
+
+can trigger package loading before the learner code executes. The first run may take longer while the required package is prepared. Not every Python package available on the wider Python ecosystem is necessarily compatible with Pyodide.
+
+The current supported Python authoring contract is intentionally small:
+
+| Field | Values | Purpose |
+| --- | --- | --- |
+| `Language ::` | `python` | Select Python. |
+| `Mode ::` | `static`, `pyodide` | Display code only or provide browser execution. |
+| `Source ::` | Relative `.py` path | Load external Python source. |
+| `Data ::` | Relative course-local path | Stage a data file into Pyodide. May be repeated. |
+
+R-specific display flags such as `Echo ::` and `Output ::` should not be assumed to have equivalent Python behaviour. Use the simpler Python contract above unless the current release documentation explicitly states otherwise.
+
+## 12. Plain JavaScript interactions
 
 Use this component for a self-contained interaction supplied as one course-local `.js` file:
 
@@ -340,7 +440,7 @@ The JavaScript file is inserted directly into the generated page. It should:
 
 Plain JavaScript interactions are different from standalone HTML embeds. Use the HTML component when the activity is already a complete HTML document.
 
-## 12. Images and downloadable files
+## 13. Images and downloadable files
 
 Store course resources under the appropriate `resources/` subfolder.
 
@@ -367,7 +467,7 @@ END File
 
 Use a descriptive label and identify the file type or purpose when that helps learners.
 
-## 13. Video and standalone HTML
+## 14. Video and standalone HTML
 
 ### YouTube
 
@@ -397,7 +497,7 @@ END HTML Embed
 
 Use `Fallback Image ::` when a static representation is useful in non-HTML outputs. Test keyboard access, resizing and offline behaviour.
 
-## 14. Accessibility checklist
+## 15. Accessibility checklist
 
 Before marking a page complete, confirm that:
 
@@ -414,7 +514,7 @@ Before marking a page complete, confirm that:
 
 Accessibility should be checked in the rendered outputs, not only in Word.
 
-## 15. Author review and quality assurance
+## 16. Author review and quality assurance
 
 After a substantive content update, authors and reviewers should check the generated publication for:
 
@@ -423,15 +523,16 @@ After a substantive content update, authors and reviewers should check the gener
 3. Images, captions, alternative text, downloads and embedded media.
 4. Every reveal, self-check, tab and quiz used in the edited material.
 5. R examples, figures, tables and WebR activities where relevant.
-6. JavaScript or HTML interactions where relevant.
-7. The combined handbook, particularly whether interactive material has a useful static representation.
-8. Any content-related warnings reported by the publishing operator.
+6. Python/Pyodide activities, package-dependent examples and staged data where relevant.
+7. JavaScript or HTML interactions where relevant.
+8. The combined handbook, particularly whether interactive material has a useful static representation.
+9. Any content-related warnings reported by the publishing operator.
 
 Use tracked changes and comments during review where appropriate, but resolve tracked changes before treating the source Word file as complete. Reimport after accepted corrections.
 
 Detailed technical QA, render diagnostics and deployment checks are covered in the **Learning Publisher Operating Handbook**.
 
-## 16. Authoring troubleshooting
+## 17. Authoring troubleshooting
 
 ### A directive appears as ordinary text
 
@@ -453,6 +554,19 @@ Source :: code/example.R
 
 Confirm the filename, extension and letter case. Absolute paths and paths outside the course folder are not appropriate.
 
+### A Python/Pyodide activity does not run
+
+Check that:
+
+- `Language :: python` and `Mode :: pyodide` are present;
+- the `.py` source exists when `Source ::` is used;
+- any `Data ::` file exists inside the course folder;
+- Python code reads staged data from `data/<filename>`;
+- the browser has access to any Pyodide/package assets required for the activity; and
+- the browser console does not show a runtime or package-loading error.
+
+The first run of an activity using a package such as pandas or Matplotlib can take longer while the package is loaded.
+
 ### A correction does not appear in the publication
 
 Confirm that:
@@ -468,13 +582,13 @@ For command-line errors, virtual-environment problems, PDF/TinyTeX failures, ren
 
 Close Word and remove files beginning with `~$`. These are temporary lock files and are not course source documents.
 
-## 17. Source and handover principles
+## 18. Source and handover principles
 
 Authors should treat the course-local Word documents, referenced code and resources as maintained source material. Do not edit files under `build/` or `output/` as the master copy.
 
 If you work directly with the Git repository, do not commit temporary Word lock files beginning with `~$`. Detailed Git, branch, generated-file and repository-maintenance guidance is provided in the **Learning Publisher Operating Handbook**.
 
-## 18. Author handover checklist
+## 19. Author handover checklist
 
 Before handing a course to another author or publishing it:
 

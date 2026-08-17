@@ -10,9 +10,11 @@ Depending on the course configuration, Learning Publisher can create:
 - Printable HTML
 - Individual page outputs and combined Word/PDF handbooks
 - Static R examples and browser-based WebR activities
+- Static Python examples and browser-based Python activities powered by Pyodide
 - Self-checks, quizzes, reveals, tabs and callouts
 - Images, downloadable files, video and standalone HTML embeds
 - Self-contained JavaScript interactions supplied as one `.js` file
+- Course-local data for browser-side R and Python activities
 
 ## Live demo
 
@@ -152,6 +154,7 @@ imports/courses/outbreak_ve_demo/
 │   └── course_glossary.docx
 ├── code/
 │   ├── outbreak-risk-table.R
+│   ├── outbreak-pandas-example.py
 │   └── sir-model-interaction.js
 └── resources/
     ├── data/
@@ -181,8 +184,56 @@ course-local `course.yml`. Routine authors do not need to write Quarto Markdown
 directly.
 
 Learning Publisher supports reveals, self-checks, callouts, tabs, quizzes,
-static R and WebR content, plain JavaScript interactions, images, downloadable
-resources, video and standalone HTML activities.
+static R and WebR content, static Python and Pyodide content, plain JavaScript
+interactions, images, downloadable resources, video and standalone HTML activities.
+
+The current public demo focuses on the established Word/WebR workflow. Python/Pyodide
+support is implemented in the publisher and can be used in course-local projects even
+where the public demo has not yet been expanded to show it.
+
+## Browser code runtimes
+
+Learning Publisher now uses a modular code-engine architecture.
+
+### R and WebR
+
+Existing `R Code` authoring remains supported. Static R executes during publication,
+while `R Mode :: webr` creates an editable browser activity. Course-local data under
+`resources/data/` can be staged for WebR. When WebR code references a compatible
+package such as `library(dplyr)`, missing-package handling is enabled lazily: package
+download occurs when the learner runs code that needs it rather than blocking initial
+page load.
+
+Example:
+
+```text
+R Code
+Source :: code/webr-dplyr-test.R
+R Mode :: webr
+END R Code
+```
+
+### Python and Pyodide
+
+Python uses the generic `Code` directive:
+
+```text
+Code
+Language :: python
+Mode :: pyodide
+Source :: code/outbreak-pandas-example.py
+Data :: resources/data/outbreak-patients.csv
+END Code
+```
+
+`Mode :: static` displays Python without browser execution. `Mode :: pyodide` provides
+an editable browser activity with a Run control and output area. Compatible imported
+packages are loaded on demand; tested examples include pandas and Matplotlib. Course-local
+files declared with `Data ::` are staged into Pyodide under `data/<filename>`.
+
+The supported Python metadata is intentionally compact: `Language`, `Mode`, `Source`
+and optional repeated `Data` lines. R-specific `Echo`/`Output` behaviour should not be
+assumed for Pyodide.
 
 ## Documentation
 
@@ -198,7 +249,7 @@ For detailed Word authoring conventions, directive syntax and examples, see the
 ```text
 assemblies/     Publication assembly configuration
 imports/        Course-local YAML, Word sources, code and resources
-src/            Python application code
+src/            Python application code (core, engines and interactions)
 templates/      Quarto and interaction templates
 build/          Generated Quarto working projects
 output/         Rendered publications

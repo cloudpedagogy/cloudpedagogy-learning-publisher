@@ -27,8 +27,8 @@ source files.
     content and use the supported Learning Publisher authoring
     components and directives.
 
-5.  **R, WebR & Custom Interactions** – covers static R examples,
-    browser-based R activities, external code files and custom
+5.  **R, WebR, Python, Pyodide & Custom Interactions** – covers static and
+    browser-based R/Python activities, external code files and custom
 ```text
 HTML/JavaScript interactions.
 ```
@@ -147,6 +147,10 @@ Publisher can produce:
 - static R examples;
 
 - browser-based WebR activities;
+
+- static Python examples and browser-based Pyodide activities;
+
+- course-local data staging and browser-side package loading for supported code activities;
 
 - self-checks, quizzes, reveals, tabs and callouts;
 
@@ -621,6 +625,7 @@ imports/courses/my_course/
 │ └── glossary.docx
 ├── code/
 │ ├── example.R
+│ ├── example.py
 │ └── interaction.js
 └── resources/
 ├── data/
@@ -1052,6 +1057,7 @@ For example:
 ```text
 code/example.R
 code/outbreak-risk-table.R
+code/outbreak-pandas-example.py
 code/sir-model-interaction.js
 ```
 
@@ -1060,7 +1066,7 @@ A Word directive can then reference a course-relative file such as:
 Source :: code/example.R
 
 Keeping code external to the Word document is particularly useful for
-substantial R or JavaScript examples because the code can be:
+substantial R, Python or JavaScript examples because the code can be:
 
 - tested independently;
 
@@ -1348,7 +1354,7 @@ learner experience.
 |----|----|----|
 | course.yml | Defines course structure and publication configuration | Yes |
 | docx/ | Microsoft Word academic source | Yes |
-| code/ | Course-specific R/JavaScript and similar code | Yes |
+| code/ | Course-specific R, Python, JavaScript and similar code | Yes |
 | resources/ | Images, data, HTML, PDFs and other assets | Yes |
 | build/courses/<course>/ | Generated Quarto working project | Normally no |
 | output/courses/<course>/ | Rendered publication | Normally no |
@@ -1470,61 +1476,43 @@ output**, rather than the primary location for editing course content.
 Where possible, changes should therefore be made in the Word source and
 the course rebuilt.
 
-## 4.2 One Word Document per Page
+## 4.2 Word Source Documents and Published Pages
 
-The standard Learning Publisher model uses a separate Word document for
-each course page.
+Word source documents are stored inside the course-local `docx/` folder, for example:
 
-For example:
-
-```bash
-source/
-├── introduction.docx
-├── epidemiological-measures.docx
-├── study-design.docx
-├── visualising-data.docx
-└── summary.docx
+```text
+imports/courses/my_course/
+├── course.yml
+└── docx/
+    ├── 01_introduction.docx
+    ├── 02_epidemiological_measures.docx
+    └── course_glossary.docx
 ```
 
-These files are referenced from the course configuration.
+The relationship between a Word document and the published course is controlled by `course.yml`. A configured subpage uses `source_docx` to identify its Word source:
 
 ```yaml
-Conceptually:
 sessions:
+  - id: EXAMPLE_01-se01
+    code: SE01
+    title: "Introduction"
+    sections:
+      - id: EXAMPLE_01-se01-sec01
+        title: "Core concept"
+        kind: section_overview
+        number: 1
+        subpages:
+          - id: EXAMPLE_01-se01-sec01-sp01
+            title: "Core concept"
+            kind: text_page
+            source_docx: "docx/01_introduction.docx"
 ```
 
-\- title: "Introduction"
+`source_docx` paths are resolved from the folder containing `course.yml`, so course-relative paths should be used.
 
-```yaml
-pages:
-```
+Learning Publisher is not restricted to a universal “one Word document per web page” rule. A course can use pre-split Word files, and structured Word material can also support a publication that is divided into configured learner-facing pages where the importer and course structure support that mapping.
 
-\- title: "Introduction to the module"
-
-```bash
-source: "source/introduction.docx"
-```
-
-\- title: "Epidemiological measures"
-
-```bash
-source: "source/epidemiological-measures.docx"
-```
-
-Separating pages in this way makes the relationship between source
-material and published pages explicit.
-
-It also makes individual pages easier to:
-
-- review;
-
-- replace;
-
-- version;
-
-- troubleshoot;
-
-- regenerate.
+The practical principle is to design the published navigation for learners while keeping the Word source maintainable for authors.
 
 ## 4.3 Heading Structure
 
@@ -2100,7 +2088,65 @@ WebR activities should always be tested in the final rendered output
 rather than assuming that valid R code will automatically produce an
 appropriate browser-based learning activity.
 
-## 4.19 Independent Coding Activities
+## 4.19 Python and Pyodide Activities
+
+Learning Publisher supports Python through the generic `Code` directive. Python can be displayed as static code or executed interactively in the browser with Pyodide.
+
+Static display:
+
+```text
+Code
+Language :: python
+Mode :: static
+Source :: code/example.py
+END Code
+```
+
+Interactive browser execution:
+
+```text
+Code
+Language :: python
+Mode :: pyodide
+Source :: code/outbreak-risk-table.py
+END Code
+```
+
+Interactive Python provides an editable code area, a Run control and an output area. Text output and table-like printed output are displayed directly. Matplotlib figures are captured and embedded cleanly in the Learning Publisher page rather than using the default notebook-style figure window.
+
+Course-local data can be staged into the Pyodide runtime:
+
+```text
+Code
+Language :: python
+Mode :: pyodide
+Source :: code/outbreak-pandas-example.py
+Data :: resources/data/outbreak-patients.csv
+END Code
+```
+
+The corresponding Python code reads the staged file from `data/<filename>`, for example:
+
+```python
+import pandas as pd
+
+df = pd.read_csv("data/outbreak-patients.csv")
+print(df.head())
+```
+
+Compatible imported packages are loaded on demand when the learner runs the activity. Tested examples include pandas and Matplotlib. First execution can take longer while packages are prepared. Not every package in the wider Python ecosystem is necessarily available or compatible with Pyodide.
+
+The current Python metadata contract is intentionally compact:
+
+- `Language :: python` selects Python;
+- `Mode :: static` displays code without execution;
+- `Mode :: pyodide` provides browser execution;
+- `Source ::` points to an external `.py` file;
+- `Data ::` stages a course-local file and may be repeated.
+
+Do not assume that R-specific `Echo ::`, `Output ::`, `Alt ::` or `Caption ::` flags have equivalent Pyodide semantics unless a later release explicitly documents them.
+
+## 4.20 Independent Coding Activities
 
 Where learners are expected to write or modify code independently, the
 activity should make the distinction between demonstration and learner
@@ -2131,7 +2177,7 @@ The instructions should specify:
 This makes the activity pedagogically clearer than simply presenting an
 editable code block without explanation.
 
-## 4.20 External Files and Resources
+## 4.21 External Files and Resources
 
 Learning pages can reference supporting resources stored within the
 project.
@@ -2164,7 +2210,7 @@ Absolute local paths should not be embedded in course content because
 they will normally fail when the project is moved to another computer or
 server.
 
-## 4.21 YouTube
+## 4.22 YouTube
 
 YouTube material can be incorporated into course pages using the
 supported Learning Publisher media mechanism.
@@ -2188,7 +2234,7 @@ Authors should also consider:
 A video should normally be introduced in the learning content rather
 than appearing without explanation.
 
-## 4.22 Panopto
+## 4.23 Panopto
 
 Learning Publisher can also support Panopto content.
 
@@ -2207,7 +2253,7 @@ generate the link or embed, but it cannot make a restricted Panopto
 recording accessible to a learner who does not have permission to view
 it.
 
-## 4.23 Mathematical Content
+## 4.24 Mathematical Content
 
 Mathematical expressions can be included in learning content and
 converted into suitable web representations.
@@ -2232,43 +2278,37 @@ it can be:
 
 - interpreted by appropriate assistive technologies.
 
-## 4.24 Custom HTML and JavaScript Interactions
+## 4.25 JavaScript and Standalone HTML Interactions
 
-Learning Publisher can accommodate custom interactive material where the
-standard components are insufficient.
+Learning Publisher supports two distinct approaches for custom browser-based material.
 
-For example, a course might contain a purpose-built JavaScript
-interaction stored within the project.
+A **plain JavaScript interaction** is supplied as a course-local `.js` file, normally under `code/`, and referenced using the `JavaScript Interaction` directive. For example:
 
-```yaml
-Conceptually:
-interactions/
-└── risk-calculator/
-├── index.html
-├── script.js
-└── style.css
+```text
+JavaScript Interaction
+Source :: code/sir-model-interaction.js
+Container ID :: sir-model
+Interaction :: sir-model
+Alt :: Interactive SIR epidemic model showing susceptible, infectious and recovered populations over time.
+Caption :: Explore how transmission and recovery affect an epidemic
+END JavaScript Interaction
 ```
 
-The Word source can determine where that interaction should appear.
+A **standalone HTML activity** is already a complete HTML document. Store trusted local HTML under `resources/html/` and use the HTML component, for example:
 
-Custom interactions should be treated as more advanced components
-because they introduce additional requirements for:
+```text
+HTML Embed :: resources/html/distribution-demo.html
+Title :: Interactive distribution demonstration
+Height :: 700
+Fallback Image :: resources/images/distribution-demo-fallback.png
+END HTML Embed
+```
 
-- testing;
+Use the JavaScript component for a self-contained script that creates its interaction inside the generated page. Use the HTML component when the activity is already a complete HTML document.
 
-- accessibility;
+Custom interactions require additional testing for accessibility, browser compatibility, local dependencies and maintenance. Prefer a standard Learning Publisher component where it already meets the learning requirement.
 
-- browser compatibility;
-
-- maintenance;
-
-- security review.
-
-Where a standard Learning Publisher component can achieve the same
-educational objective, the standard component will generally be easier
-to maintain.
-
-## 4.25 Authoring for Accessibility
+## 4.26 Authoring for Accessibility
 
 Accessibility should begin in the Word source rather than being treated
 solely as a correction applied after publishing.
@@ -2297,7 +2337,7 @@ Generated content should still be tested after rendering because
 accessible source material does not guarantee that every generated
 interaction will behave correctly.
 
-## 4.26 Authoring for Maintainability
+## 4.27 Authoring for Maintainability
 
 The source should be written with future maintenance in mind.
 
@@ -2330,7 +2370,7 @@ technical implementation in the publishing system.
 For most pages, this means the academic author works primarily in Word
 while Learning Publisher manages the technical transformation.
 
-## 4.27 What Authors Should Not Normally Edit
+## 4.28 What Authors Should Not Normally Edit
 
 After conversion, Learning Publisher generates Quarto source files and
 supporting assets.
@@ -2389,7 +2429,7 @@ behaviour, it should normally be implemented in the Learning Publisher
 templates, transformation code, configuration or supported extension
 mechanism rather than repeatedly patched into generated pages.
 
-## 4.28 Reviewing the Generated Page
+## 4.29 Reviewing the Generated Page
 
 Authors should review the rendered HTML rather than relying entirely on
 the appearance of the Word source.
@@ -2420,6 +2460,8 @@ For each page, check:
 
 - WebR execution;
 
+- Python/Pyodide execution;
+
 - videos;
 
 - downloadable resources;
@@ -2439,7 +2481,7 @@ HTML = learner-facing implementation
 
 Both should be reviewed, but for different purposes.
 
-## 4.29 Recommended Authoring Workflow
+## 4.30 Recommended Authoring Workflow
 
 A practical workflow for developing a new page is:
 
@@ -2476,7 +2518,7 @@ A practical workflow for developing a new page is:
 This maintains a clear separation between **authoring**, **generation**
 and **publication**.
 
-## 4.30 Authoring Principle
+## 4.31 Authoring Principle
 
 The central authoring principle of Learning Publisher is:
 
@@ -2494,7 +2536,7 @@ This allows Microsoft Word to remain a practical academic authoring and
 review environment while Learning Publisher handles the transformation
 into structured digital learning materials.
 
-# 5. R, WebR & Custom Interactions
+# 5. R, WebR, Python, Pyodide & Custom Interactions
 
 Learning Publisher supports code-based and custom interactive learning
 materials alongside standard Word-authored content.
@@ -2505,7 +2547,13 @@ The main supported approaches are:
 
 - executable R activities using WebR;
 
-- external R source files;
+- static Python examples;
+
+- executable Python activities using Pyodide;
+
+- external `.R` and `.py` source files;
+
+- course-local data for browser runtimes;
 
 - custom HTML and JavaScript interactions;
 
@@ -2763,7 +2811,7 @@ Check that:
 
 - the WebR environment loads;
 
-- the expected packages are available;
+- expected packages are available or can be installed lazily when first required;
 
 - required data files can be accessed;
 
@@ -2784,7 +2832,29 @@ Check that:
 Testing should be performed using the same generated output that
 learners will receive.
 
-## 5.8 Browser-Based Execution
+## 5.8 WebR Package Handling
+
+Learning Publisher enables lazy missing-package handling for WebR activities that reference packages using common forms such as `library(dplyr)`, `require(...)` or package-qualified calls.
+
+The important behaviour is **lazy execution**:
+
+```text
+Page loads
+    ↓
+No package download is required merely because a later activity uses dplyr
+    ↓
+Learner runs the package-dependent WebR activity
+    ↓
+WebR installs the missing compatible package and its dependencies if needed
+    ↓
+The original R code continues
+```
+
+This avoids holding up initial page rendering for packages that the learner may never use. The first run of a package-dependent activity can take longer while dependencies are downloaded. Later use in the same active browser runtime can reuse packages already made available there.
+
+Only browser-compatible WebR packages can be installed this way. Package-dependent activities should therefore be tested in the final rendered course.
+
+## 5.9 Browser-Based Execution
 
 A major characteristic of WebR is that R executes in the browser.
 
@@ -2826,7 +2896,7 @@ with the constraints of the browser environment in mind.
 Large datasets, complex dependencies or computationally expensive
 analyses may not be appropriate for WebR-based activities.
 
-## 5.9 Local and Offline Use
+## 5.10 Local and Offline Use
 
 Generated learning materials can be viewed locally, and browser-based
 execution can support learning activities without a conventional R
@@ -2842,7 +2912,7 @@ delivery is required.
 Do not assume that an activity is fully offline-compatible simply
 because R executes in the browser.
 
-## 5.10 Supporting Data and Resources
+## 5.11 Supporting Data and Resources
 
 R activities may require datasets or other supporting files.
 
@@ -2874,41 +2944,100 @@ over a machine-specific path such as:
 Machine-specific paths make the project difficult to move between local
 computers, virtual machines and publishing environments.
 
-## 5.11 Custom HTML and JavaScript
+## 5.12 Python and Pyodide
 
-Learning Publisher can also incorporate custom HTML and JavaScript where
-an activity cannot reasonably be implemented using the standard
-components.
-
-Examples might include:
-
-- interactive diagrams;
-
-- simulations;
-
-- specialist calculators;
-
-- bespoke data visualisations;
-
-- interactive decision activities.
-
-A project might contain:
+Python support follows the same Word-first principle as R while using a separate browser runtime.
 
 ```text
-interactions/
-└── risk-calculator/
-├── index.html
-├── script.js
-└── style.css
+Word Code directive
+      ↓
+external or inline Python
+      ↓
+Learning Publisher code router
+      ↓
+Pyodide
+      ↓
+Python executes in the learner's browser
 ```
 
-The interaction can then be referenced from the learning content using
-the mechanism supported by Learning Publisher.
+Use `Mode :: static` for display-only Python and `Mode :: pyodide` when learners need to edit and run code.
 
-Keeping the interaction in its own directory makes its dependencies
-easier to identify and maintain.
+A typical external-source activity is:
 
-## 5.12 When to Use a Custom Interaction
+```text
+Code
+Language :: python
+Mode :: pyodide
+Source :: code/example.py
+END Code
+```
+
+### Course-local Python data
+
+Use `Data ::` to stage a file into the Pyodide virtual filesystem:
+
+```text
+Code
+Language :: python
+Mode :: pyodide
+Source :: code/outbreak-pandas-example.py
+Data :: resources/data/outbreak-patients.csv
+END Code
+```
+
+The file is then available under `data/outbreak-patients.csv` inside the Python runtime. Multiple `Data ::` lines can be used where an activity requires several files.
+
+### Python packages
+
+The Pyodide renderer inspects imports and loads compatible packages on demand before executing learner code. This has been tested with pandas and Matplotlib. The first run of a package-dependent activity may therefore be slower than a standard-library-only activity.
+
+Matplotlib output is captured and embedded as a clean course figure. Plain `print()` output and text-based table output are displayed in the activity output area.
+
+As with WebR, browser execution is intended for appropriately sized learning activities rather than unrestricted desktop-scale computation.
+
+## 5.13 JavaScript and Standalone HTML
+
+Learning Publisher currently supports plain course-local JavaScript interactions and standalone HTML activities.
+
+For a JavaScript interaction, keep the `.js` file in the course's `code/` folder:
+
+```text
+code/
+└── sir-model-interaction.js
+```
+
+Reference it from Word using the supported directive:
+
+```text
+JavaScript Interaction
+Source :: code/sir-model-interaction.js
+Container ID :: sir-model
+Interaction :: sir-model
+Alt :: Interactive SIR epidemic model showing susceptible, infectious and recovered populations over time.
+Caption :: Explore how transmission and recovery affect an epidemic
+END JavaScript Interaction
+```
+
+For an activity that is already a complete HTML document, store it under `resources/html/`:
+
+```text
+resources/html/
+└── distribution-demo.html
+```
+
+and use:
+
+```text
+HTML Embed :: resources/html/distribution-demo.html
+Title :: Interactive distribution demonstration
+Height :: 700
+Fallback Image :: resources/images/distribution-demo-fallback.png
+END HTML Embed
+```
+
+These are different integration models: the JavaScript interaction is inserted into the generated page, whereas the HTML component embeds a complete trusted local HTML document.
+
+## 5.14 When to Use a Custom Interaction
 
 Custom HTML or JavaScript should not be the default approach.
 
@@ -2931,7 +3060,7 @@ provide.
 
 This distinction helps keep courses maintainable.
 
-## 5.13 Maintaining Custom Interactions
+## 5.15 Maintaining Custom Interactions
 
 Custom interactions introduce additional technical responsibilities.
 
@@ -2952,7 +3081,7 @@ Where external libraries are required, their use should also be
 documented so that the interaction can be reproduced in another
 environment.
 
-## 5.14 Accessibility of Interactive Content
+## 5.16 Accessibility of Interactive Content
 
 Interactive activities require accessibility testing in addition to
 ordinary content review.
@@ -2980,7 +3109,7 @@ Custom JavaScript components require particular attention because
 Learning Publisher cannot automatically guarantee the accessibility of
 arbitrary custom code.
 
-## 5.15 Choosing the Appropriate Approach
+## 5.17 Choosing the Appropriate Approach
 
 The simplest component that meets the learning objective should normally
 be used.
@@ -3040,36 +3169,31 @@ Custom HTML / JavaScript
 This avoids introducing unnecessary technical complexity into course
 materials.
 
-## 5.16 Recommended Project Structure
+## 5.18 Recommended Project Structure
 
 A course containing code and interactive resources might use a structure
 such as:
 
 ```text
-project/
-├── config/
-│ └── course.yml
-│
-├── source/
+imports/courses/my_course/
+├── course.yml
+├── docx/
 │ ├── introduction.docx
 │ ├── visualising-data.docx
 │ └── exercise.docx
-│
 ├── code/
 │ ├── example.R
-│ └── exercise.R
-│
+│ ├── exercise.R
+│ └── python-example.py
 ├── resources/
 │ └── data/
 │ └── outbreak.csv
 │
-├── interactions/
 │ └── risk-calculator/
 │ ├── index.html
 │ ├── script.js
 │ └── style.css
 │
-└── output/
 ```
 
 The exact structure of an existing Learning Publisher project should be
@@ -3086,7 +3210,7 @@ Interactions → custom interactive components
 Generated → publishing output
 ```
 
-## 5.17 Editing and Regeneration
+## 5.19 Editing and Regeneration
 
 As with ordinary course content, generated R and interaction output
 should not normally become the primary editing source.
@@ -3121,38 +3245,27 @@ If a problem repeatedly requires manual modification of generated HTML,
 it is usually better to correct the relevant source, template or
 Learning Publisher transformation.
 
-## 5.18 Future Code Environments
+## 5.20 Multi-Runtime Architecture
 
-The code integration model is designed so that additional programming
-environments can be incorporated without changing the fundamental
-Word-first publishing workflow.
+Learning Publisher now uses a modular code-engine architecture rather than treating R handling as part of one monolithic Word importer.
 
-The core pattern remains:
-
-Word learning content
-
-+
-
-external code/resources
+The implemented model is:
 
 ```text
-↓
+Generic/legacy Word code directives
+            ↓
+      code routing layer
+        ├── R
+        │   ├── static R
+        │   └── WebR
+        └── Python
+            ├── static display
+            └── Pyodide
 ```
 
-Learning Publisher
+R/WebR and Python/Pyodide can coexist on the same generated page. Their runtime-specific support is isolated under `src/course_generator/engines/`, while ordinary learning interactions are isolated under `src/course_generator/interactions/`.
 
-```text
-↓
-```
-
-learner-facing course
-
-Only environments that are actually implemented and tested should be
-treated as supported functionality.
-
-This keeps the authoring model extensible while ensuring that the
-handbook describes the capabilities of the current Learning Publisher
-release accurately.
+This architecture allows additional engines to be considered later without returning code-specific logic to the central Word importer. Only environments actually implemented and regression-tested should be described as supported.
 
 Section 6 should now cover the operational pipeline: generating the
 course, rendering it, previewing it, and understanding the resulting
@@ -3161,829 +3274,278 @@ remain in Section 8.
 
 # 6. Building & Publishing
 
-Once the course configuration, Word source documents and supporting
-resources are ready, Learning Publisher can generate the Quarto project
-and render the final learning materials.
-
-The standard workflow is:
-
-Word + YAML + resources
+Learning Publisher uses a defined publishing pipeline. For routine course publication, run the commands from the repository root against the course-local `course.yml`.
 
 ```text
-↓
+Course source
+    ↓
+Validate
+    ↓
+Build
+    ↓
+Import Word
+    ↓
+Build handbook
+    ↓
+Render
+    ↓
+Website and configured document outputs
 ```
 
-Learning Publisher
+The maintained course source normally lives under:
 
 ```text
-↓
+imports/courses/my_course/
+├── course.yml
+├── docx/
+├── code/
+└── resources/
 ```
 
-Generated Quarto project
-
-```text
-↓
-```
-
-Quarto render
-
-```text
-↓
-```
-
-HTML course
-
-The generated Quarto files should normally be treated as build output.
-Changes to course content should be made in the Word source,
-configuration or supporting files and then regenerated.
+Generated Quarto working files are created under `build/courses/<course>/`, and rendered publication output is created under `output/courses/<course>/`.
 
 ## 6.1 Activate the Python Environment
 
-Before running Learning Publisher, activate the project's Python virtual
-environment.
-
-On macOS or Linux:
+From the repository root, activate the virtual environment:
 
 ```bash
 source .venv/bin/activate
 ```
 
-If the environment has not yet been created:
+If the environment has not yet been created, the current repository setup is:
 
 ```bash
-python3 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-Once activated, the shell prompt will normally indicate that the virtual
-environment is in use.
+If `python3.13` is unavailable but `python3` is a supported version, substitute `python3`.
 
-For example:
+On Windows PowerShell:
 
-(.venv) user@computer learning-publisher %
-
-The environment only needs to be created once. It should be activated
-again whenever a new terminal session is used to run the Python tools.
-
-## 6.2 Check Quarto
-
-Learning Publisher generates a Quarto project, so Quarto must be
-available when the course is rendered.
-
-Check the installation with:
-
-```bash
-quarto --version
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-If Quarto returns a version number, it is available from the current
-command line.
+## 6.2 Check the Main Tools
 
-You can also check Python:
+Check the environment:
 
 ```bash
 python --version
+quarto --version
+pandoc --version
 ```
 
-or, depending on the environment:
+TinyTeX is required when PDF publishing is needed:
 
 ```bash
-python3 --version
+quarto install tinytex
 ```
 
-## 6.3 Run from the Project Root
+System R is required when static R code is executed during rendering. Browser-based WebR does not by itself require a local R installation.
 
-Commands should normally be run from the root of the Learning Publisher
-repository.
+## 6.3 Validate the Course
 
-For example:
+Validate the YAML before building:
 
 ```bash
-cd cloudpedagogy-learning-publisher
+python -m course_generator.cli validate imports/courses/my_course/course.yml
 ```
 
-You should then be able to see the main project directories and files.
+Validation loads the course configuration and reports configuration errors before later publishing stages are attempted.
 
-A simplified project structure might resemble:
-
-```text
-cloudpedagogy-learning-publisher/
-├── config/
-├── docs/
-├── src/
-├── requirements.txt
-└── ...
-```
-
-Running commands from a predictable location avoids problems with
-relative paths to configuration files, Word documents, code and
-resources.
-
-## 6.4 Generate the Course
-
-The course configuration provides Learning Publisher with the
-information required to assemble the course.
-
-Conceptually, the command follows the pattern:
+The optional inspection command provides a readable summary of the interpreted course structure:
 
 ```bash
-python \<publisher-script\> \<course-config\>
+python -m course_generator.cli inspect imports/courses/my_course/course.yml
 ```
 
-For example:
+## 6.4 Build the Generated Quarto Project
+
+Build the course scaffold:
 
 ```bash
-python src/\<publisher-script\>.py config/<course>.yml
+python -m course_generator.cli build imports/courses/my_course/course.yml
 ```
 
-Use the actual script and configuration filenames provided by the
-current repository.
+By default this creates or updates:
 
-The generation stage reads the course configuration and associated Word
+```text
+build/courses/my_course/
+```
+
+The build directory is generated working material rather than the maintained academic source.
+
+`build` must precede `import-word`, because the importer writes the converted Word content into the generated Quarto scaffold.
+
+## 6.5 Import the Word Content
+
+Import the configured Word sources:
+
 ```bash
-source files, then creates the corresponding Quarto source and
-supporting files.
+python -m course_generator.cli import-word imports/courses/my_course/course.yml
 ```
 
-The process is:
+The importer reads the Word documents identified through the course configuration and transforms supported Word structures and directives into the generated Quarto pages.
 
-course.yml
+After changing Word content, referenced R/Python/JavaScript code or relevant local resources, rerun the import stage before creating the next publication.
 
-+
+## 6.6 Build the Handbook
 
-Word documents
+Build the combined handbook source and configured document outputs:
 
-+
-
-resources
-
-```text
-↓
-```
-
-Learning Publisher
-
-```text
-↓
-```
-
-Quarto source
-
-Any errors reported during this stage should be resolved before
-proceeding to publication.
-
-## 6.5 Generated Quarto Project
-
-The generated project contains the files required by Quarto to construct
-the learner-facing course.
-
-Depending on the configuration and features used, this may include:
-
-- .qmd pages;
-
-- Quarto configuration;
-
-- navigation definitions;
-
-- images;
-
-- stylesheets;
-
-- JavaScript;
-
-- R resources;
-
-- WebR components;
-
-- downloadable resources;
-
-- other supporting assets.
-
-These files form the intermediate publishing layer between the
-maintainable source and the final course.
-
-The relationship is:
-
-Maintainable source
-
-Word / YAML / code / resources
-
-```text
-↓
-```
-
-Learning Publisher
-
-```text
-↓
-```
-
-Generated Quarto
-
-```text
-↓
-```
-
-Quarto
-
-```text
-↓
-```
-
-Published output
-
-## 6.6 Do Not Normally Edit Generated Files
-
-Generated .qmd, HTML or supporting files should not normally be edited
-directly.
-
-For example, avoid this workflow:
-
-Word
-
-```text
-↓
-```
-
-Generate
-
-```text
-↓
-```
-
-Manually edit .qmd
-
-```text
-↓
-Render
-```
-
-The course may initially appear correct, but the manual changes can be
-lost the next time Learning Publisher regenerates the project.
-
-```yaml
-Instead:
-```
-
-Edit source
-
-```text
-↓
-```
-
-Generate
-
-```text
-↓
-Render
-↓
-```
-
-Review
-
-If the same manual correction is repeatedly required, the underlying
 ```bash
-source, configuration, template or transformation should normally be
-corrected.
+python src/course_generator/tools/build_handbook_from_quarto.py build/courses/my_course
 ```
+
+This stage works from the generated Quarto project. Interactive browser-only material is converted to an appropriate static representation where supported for handbook output.
 
 ## 6.7 Render the Course
 
-Once the Quarto source has been generated, render the project with
-Quarto.
-
-From the generated Quarto project directory:
+Render the publication:
 
 ```bash
-quarto render
+python -m course_generator.cli render imports/courses/my_course/course.yml --no-versioned
 ```
 
-Quarto processes the project and creates the published output.
-
-For a website, the resulting files commonly include:
-
-\_site/
+The default rendered output location is:
 
 ```text
-├── index.html
-├── ...
-├── site_libs/
-└── supporting assets
+output/courses/my_course/
 ```
 
-The exact output structure depends on the Quarto configuration generated
-by Learning Publisher.
+`--no-versioned` is useful during routine testing because the same output location is replaced. Omit it when the renderer's default versioned-output behaviour is required.
 
-## 6.8 Preview the Course
-
-During development, Quarto's preview server is usually the most
-convenient way to inspect the course.
+On macOS, the resulting website can be opened with:
 
 ```bash
-Run:
-quarto preview
+open output/courses/my_course/index.html
 ```
 
-Quarto will start a local web server and provide a local address that
-can be opened in a browser.
+On other operating systems, open `output/courses/my_course/index.html` in a browser.
 
-This allows you to review the course in an environment closer to normal
-web delivery than opening individual files directly.
+## 6.8 The Five Commands to Remember
 
-Preview mode is particularly useful while checking:
-
-- navigation;
-
-- internal links;
-
-- images;
-
-- styling;
-
-- quizzes;
-
-- reveal components;
-
-- WebR;
-
-- JavaScript interactions;
-
-- downloadable resources.
-
-Stop the preview server with:
-
-Ctrl+C
-
-## 6.9 Opening Rendered HTML Locally
-
-Rendered HTML can also be inspected locally.
-
-For simple static pages, opening the generated HTML file directly may be
-sufficient.
-
-However, some browser functionality behaves differently when pages are
-opened through a file:// path rather than served through a web server.
-
-For that reason, when testing interactive content, prefer:
+For normal publication:
 
 ```bash
-quarto preview
+python -m course_generator.cli validate imports/courses/my_course/course.yml
+
+python -m course_generator.cli build imports/courses/my_course/course.yml
+
+python -m course_generator.cli import-word imports/courses/my_course/course.yml
+
+python src/course_generator/tools/build_handbook_from_quarto.py build/courses/my_course
+
+python -m course_generator.cli render imports/courses/my_course/course.yml --no-versioned
 ```
 
-or another local web server.
-
-The environment used for testing should reflect the intended learner
-environment as closely as practical.
-
-## 6.10 The Standard Build Cycle
-
-During course development, the normal cycle is:
-
-1. Edit Word/YAML/resources
+The order matters:
 
 ```text
-↓
+Validate → Build → Import Word → Build handbook → Render
 ```
 
-2. Generate Quarto
+## 6.9 Rebuilding After Changes
+
+If only Word content or a referenced code/resource file has changed, the usual update cycle is:
 
 ```text
-↓
-```
-
-3. Render or preview
-
-```text
-↓
-```
-
-4. Review in browser
-
-```text
-↓
-```
-
-5. Correct source
-
-```text
-↓
-```
-
-6. Regenerate
-
-This cycle can be repeated as often as required.
-
-Because the course is generated from maintainable source files, there
-should be no need to preserve manual changes within the generated
-output.
-
-## 6.11 Rebuilding After Changes
-
-If a Word document changes, regenerate the course before rendering
-again.
-
-Likewise, regenerate where changes affect:
-
-- course configuration;
-
-- navigation;
-
-- component directives;
-
-- referenced R source;
-
-- supporting resources;
-
-- generated interactions.
-
-The safest general rule is:
-
-If the source has changed, regenerate before publishing.
-
-This ensures that the published course corresponds to the current source
-material.
-
-## 6.12 Combined Build Workflow
-
-Where the repository provides orchestration or combined build commands,
-these should be preferred over repeatedly running individual stages
-manually.
-
-The purpose of orchestration is to turn a multi-stage process such as:
-
-prepare
-
-```text
-↓
-```
-
-convert Word
-
-```text
-↓
-```
-
-generate Quarto
-
-```text
-↓
-```
-
-copy resources
-
-```text
-↓
-```
-
-configure output
-
-```text
-↓
-```
-
-render
-
-into a more predictable workflow.
-
-The underlying stages remain important for troubleshooting, but routine
-users should use the simplest supported command provided by the
-repository.
-
-This is particularly useful when Learning Publisher is run on a shared
-development environment or virtual machine.
-
-## 6.13 Publishing the HTML Course
-
-A rendered Quarto website is a collection of static web files.
-
-The complete generated website can therefore be deployed to a suitable
-static web hosting environment.
-
-```yaml
-Conceptually:
-```
-
-Quarto project
-
-```bash
-↓
-quarto render
-↓
-```
-
-\_site/
-
-```text
-↓
-```
-
-Web hosting
-
-The entire generated website should be published rather than uploading
-only individual HTML pages.
-
-Supporting directories are required for styling, scripts, navigation and
-other functionality.
-
-## 6.14 Moodle Deployment
-
-Learning Publisher output can be used alongside Moodle as a delivery
-environment.
-
-A typical model is:
-
-Word source
-
-```text
-↓
-```
-
-Learning Publisher
-
-```text
-↓
-```
-
-Quarto course
-
-```text
-↓
-```
-
-Published web content
-
-```text
-↓
-```
-
-Moodle access
-
-The exact deployment approach depends on the Moodle environment and
-institutional configuration.
-
-Learning Publisher should therefore be viewed primarily as the **content
-generation and publishing layer**, rather than as a replacement for
-Moodle.
-
-Moodle can continue to provide functions such as:
-
-- enrolment;
-
-- course administration;
-
-- access control;
-
-- institutional navigation;
-
-- assessment;
-
-- learner records.
-
-Learning Publisher provides the generated learning content that can be
-incorporated into the wider delivery model.
-
-## 6.15 PDF Output
-
-Where configured, Learning Publisher can also support PDF-oriented
-output.
-
-This allows the same maintained source material to contribute to both
-web and document-based publication.
-
-```yaml
-Conceptually:
-→ HTML course
-Word + YAML → Quarto
-→ PDF
-```
-
-This supports the principle of single-source publishing: academic
-content is maintained once and transformed into different delivery
-formats.
-
-PDF output should still be reviewed separately because page-based
-documents have different layout and accessibility requirements from
-responsive web content.
-
-## 6.16 Combined Handbook or Document Output
-
-Where the project is configured to generate combined document output,
-individual learning pages can be assembled into a larger document.
-
-For example:
-
-```text
-Page 1 ─┐
-Page 2 ─┤
-Page 3 ─┼→ Combined document
-Page 4 ─┤
-Page 5 ─┘
-```
-
-This can be useful for:
-
-- course handbooks;
-
-- review copies;
-
-- archival material;
-
-- printable learning resources;
-
-- alternative formats.
-
-The ordering should be derived from the course structure rather than
-maintained manually in a separate document wherever possible.
-
-## 6.17 Publishing from a Virtual Machine
-
-Learning Publisher can also run on a Linux virtual machine.
-
-The overall process remains the same:
-
-Source files
-
-```text
-↓
-```
-
-Virtual machine
-
-```text
-↓
-```
-
-Learning Publisher
-
-```text
-↓
-```
-
-Quarto
-
-```text
-↓
-```
-
-Generated output
-
-The main difference is that generation occurs in a centrally managed
-environment rather than on an individual author's computer.
-
-This can provide a more consistent execution environment for a team
-because dependencies and publishing tools can be maintained centrally.
-
-A user may eventually need only to:
-
-upload source
-
-```text
-↓
-```
-
-run publishing command
-
-```text
-↓
-```
-
-retrieve output
-
-The precise upload, execution and retrieval process depends on the
-infrastructure in which Learning Publisher is deployed.
-
-## 6.18 Separating Source and Output
-
-Source and generated files should remain clearly separated.
-
-```yaml
-Conceptually:
-project/
-├── source/ ← maintain
-├── config/ ← maintain
-├── code/ ← maintain
-├── resources/ ← maintain
-│
-└── output/ ← generated
-```
-
-This makes it immediately clear which files should be edited and which
-can be regenerated.
-
-Generated output should not become the only copy of important academic
-content.
-
-## 6.19 Version Control
-
-The maintainable Learning Publisher source should be kept under version
-control where appropriate.
-
-This can include:
-
-- course configuration;
-
-- Word source documents where suitable;
-
-- R files;
-
-- custom interactions;
-
-- styles;
-
-- templates;
-
-- documentation;
-
-- Learning Publisher configuration.
-
-Generated output may or may not be committed depending on the project's
-deployment model.
-
-The important principle is that the source required to reproduce the
-course should be identifiable and preserved.
-
-## 6.20 Before Publishing
-
-Before releasing a build, confirm that:
-
-- the expected pages were generated;
-
-- navigation is correct;
-
-- no source documents are missing;
-
-- images display correctly;
-
-- links work;
-
-- downloadable files are available;
-
-- interactive components load;
-
-- R examples display correctly;
-
-- WebR activities execute where used;
-
-- custom interactions work;
-
-- no obvious generation errors remain.
-
-A more detailed QA and accessibility process is covered in Section 7.
-
-## 6.21 Recommended Publishing Workflow
-
-For routine use, the complete process can be understood as:
-
-1. Update Word content
-
-2. Update course.yml if required
-
-3. Update code/resources if required
-
-4. Activate the Python environment
-
-5. Run Learning Publisher
-
-6. Render the generated Quarto project
-
-7. Preview the course in a browser
-
-8. Perform QA and accessibility checks
-
-9. Correct the source where necessary
-
-10. Regenerate and retest
-
-11. Publish the completed output
-
-The central principle remains:
-
-Maintain source
-
-```text
-↓
-```
-
-Generate
-
-```text
-↓
+Import Word
+    ↓
+Build handbook
+    ↓
 Render
-↓
 ```
 
-Test
+If `course.yml`, navigation or the generated course structure changes, use the complete five-stage pipeline.
+
+When uncertain, running the full pipeline is the safest approach.
+
+## 6.10 Previewing a Single Generated Page
+
+Learning Publisher provides a `preview` command for fast feedback on a single generated QMD page:
+
+```bash
+python -m course_generator.cli preview build/courses/my_course/path/to/page.qmd
+```
+
+This renders the page to the repository's `.preview/` directory.
+
+For final QA, review the complete rendered course under `output/courses/my_course/`, because navigation, shared assets and course-wide behaviour need to be checked in the full publication.
+
+## 6.11 Source and Generated Content
+
+Maintain:
 
 ```text
-↓
+imports/courses/my_course/
+├── course.yml
+├── docx/
+├── code/
+└── resources/
 ```
 
-Publish
+Treat these as generated:
 
-This separation between source and generated output is what allows
-Learning Publisher courses to remain reproducible and maintainable as
-they evolve.
+```text
+build/courses/my_course/
+output/courses/my_course/
+```
+
+Do not make generated QMD or HTML the master copy. Correct Word, YAML, code, resources, templates or Learning Publisher itself as appropriate, then regenerate.
+
+## 6.12 Publishing and Deployment
+
+The rendered website under `output/courses/<course>/` is the learner-facing static publication. Deploy the complete rendered output so that its pages, scripts, styles, images and other resources remain together.
+
+Learning Publisher can be used alongside Moodle or another learning platform. In that model, Learning Publisher generates the content while the learning platform can continue to provide enrolment, access control, assessment, learner records and institutional navigation.
+
+Where Word or PDF handbook outputs are configured, review them separately from the interactive website because browser interactions require static representations in document formats.
+
+## 6.13 Running on a Virtual Machine
+
+The same repository commands can run on a suitably configured Linux virtual machine:
+
+```text
+Course source
+    ↓
+Learning Publisher on VM
+    ↓
+build/courses/<course>/
+    ↓
+output/courses/<course>/
+```
+
+A VM can provide a consistent shared execution environment. It changes where the publishing software runs, not the underlying five-stage workflow.
+
+## 6.14 Publishing Principle
+
+The operational principle is:
+
+```text
+Maintain source
+    ↓
+Validate
+    ↓
+Build
+    ↓
+Import
+    ↓
+Build handbook
+    ↓
+Render
+    ↓
+Review
+    ↓
+Publish
+```
 
 # 7. QA & Accessibility
 
@@ -4086,6 +3648,8 @@ browser and check:
 - R code;
 
 - WebR activities;
+
+- Python/Pyodide activities;
 
 - videos;
 
@@ -4327,7 +3891,7 @@ For every WebR activity, confirm that:
 
 - code executes;
 
-- required packages are available;
+- required packages are available or install lazily when first required;
 
 - required data can be loaded;
 
@@ -4344,7 +3908,24 @@ WebR activity works correctly.
 
 Test the complete learner-facing activity.
 
-## 7.11 Check Custom Interactions
+## 7.11 Check Python and Pyodide Activities
+
+For each browser-based Python activity, confirm that:
+
+- the Pyodide runtime loads;
+- external `.py` source appears correctly;
+- the Run control executes the learner code;
+- standard-library examples produce the expected output;
+- package-dependent examples load compatible packages successfully;
+- Matplotlib figures appear as clean embedded figures;
+- `Data ::` resources are available under `data/<filename>`;
+- pandas/CSV or other data examples produce the expected result;
+- errors are understandable; and
+- Python activities can coexist with WebR activities on the same page without interference.
+
+The first execution of package-heavy activities may take longer because packages are loaded in the browser.
+
+## 7.12 Check Custom Interactions
 
 Custom HTML and JavaScript require additional testing because their
 behaviour is not controlled entirely by the standard Learning Publisher
@@ -4380,7 +3961,7 @@ services, those dependencies should also be tested.
 Custom interactions should provide a meaningful alternative where their
 essential learning content cannot otherwise be accessed.
 
-## 7.12 Check Video and Media
+## 7.13 Check Video and Media
 
 Embedded media should be tested in the published environment.
 
@@ -4403,7 +3984,7 @@ guarantee that every learner has permission to view the recording.
 
 Test access using an appropriate learner-level account where possible.
 
-## 7.13 Keyboard Testing
+## 7.14 Keyboard Testing
 
 A useful basic accessibility test is to navigate the page without using
 a mouse.
@@ -4441,7 +4022,7 @@ Check that:
 Keyboard testing can identify significant usability problems that may
 not be apparent during ordinary mouse-based review.
 
-## 7.14 Colour and Visual Meaning
+## 7.15 Colour and Visual Meaning
 
 Information should not depend solely on colour.
 
@@ -4462,7 +4043,7 @@ Incorrect
 The same principle applies to charts, warnings, status indicators and
 custom interactions.
 
-## 7.15 Accessibility Starts in Word
+## 7.16 Accessibility Starts in Word
 
 Many accessibility problems are easier to prevent during authoring than
 to repair after publication.
@@ -4489,7 +4070,7 @@ Learning Publisher can preserve and transform structured content, but it
 cannot infer the author's intended meaning where that meaning has not
 been expressed in the source.
 
-## 7.16 Automated Accessibility Testing
+## 7.17 Automated Accessibility Testing
 
 Automated accessibility tools can be used as part of the QA process.
 
@@ -4535,7 +4116,7 @@ Content review
 
 More reliable QA
 
-## 7.17 Browser Testing
+## 7.18 Browser Testing
 
 Courses should be tested in an environment representative of learner
 use.
@@ -4560,7 +4141,7 @@ Pay particular attention to:
 If a course has specific institutional browser requirements, those
 should determine the final testing matrix.
 
-## 7.18 Responsive Review
+## 7.19 Responsive Review
 
 Where learners may access the course on different screen sizes, inspect
 pages at narrower browser widths.
@@ -4582,7 +4163,7 @@ Look particularly for:
 Responsive behaviour is especially important for custom HTML and
 JavaScript components.
 
-## 7.19 Review PDF Separately
+## 7.20 Review PDF Separately
 
 If PDF output is produced, review it separately from the HTML course.
 
@@ -4614,7 +4195,7 @@ directly in a static PDF.
 The PDF therefore needs to remain understandable when interactive
 behaviour is unavailable.
 
-## 7.20 Correct the Source, Not the Symptom
+## 7.21 Correct the Source, Not the Symptom
 
 When QA identifies a problem, determine where the problem originates.
 
@@ -4665,7 +4246,7 @@ Avoid repeatedly correcting generated .qmd or HTML files.
 A correction made at the appropriate source level will be preserved when
 the course is regenerated.
 
-## 7.21 Regression Testing
+## 7.22 Regression Testing
 
 Changes to Learning Publisher itself can affect existing course
 features.
@@ -4700,6 +4281,8 @@ Quiz
 ```text
 R
 WebR
+Python
+Pyodide
 ```
 
 Media
@@ -4712,7 +4295,7 @@ unintentionally affected an existing component.
 A stable demonstration course containing representative components can
 be particularly useful for this purpose.
 
-## 7.22 Source and Output Review
+## 7.23 Source and Output Review
 
 It is useful to distinguish two forms of review.
 
@@ -4770,7 +4353,7 @@ Generated HTML review
 
 Complete publishing review
 
-## 7.23 Pre-Publication Checklist
+## 7.24 Pre-Publication Checklist
 
 Before publishing a course, confirm:
 
@@ -4798,6 +4381,8 @@ Before publishing a course, confirm:
 
 - WebR activities execute successfully.
 
+- Python/Pyodide activities execute successfully, including representative package and data examples.
+
 - Videos and embedded media are accessible.
 
 - Custom interactions have been tested.
@@ -4817,7 +4402,7 @@ Before publishing a course, confirm:
 
 - The final course has been regenerated after the last source changes.
 
-## 7.24 QA Principle
+## 7.25 QA Principle
 
 The central QA principle is:
 
@@ -4861,1075 +4446,404 @@ troubleshooting section rather than repeating the earlier explanations.
 
 # 8. Reference & Troubleshooting
 
-This section provides a concise operational reference for common
-Learning Publisher tasks and problems.
+This section is a concise operational reference for the current Learning Publisher repository.
 
-For detailed explanations of the authoring and publishing workflow,
-refer to the earlier sections of this handbook.
+## 8.1 Core Paths
 
-## 8.1 Standard Workflow
-
-The normal Learning Publisher workflow is:
-
-Word documents
-
-+
-
-course configuration
-
-+
+Maintained course source:
 
 ```text
-code/resources
-↓
+imports/courses/my_course/
+├── course.yml
+├── docx/
+├── code/
+└── resources/
 ```
 
-Learning Publisher
+Generated working project:
 
 ```text
-↓
+build/courses/my_course/
 ```
 
-Generated Quarto project
+Rendered publication:
 
 ```text
-↓
+output/courses/my_course/
 ```
 
-Quarto render
+Paths referenced from `course.yml` and Word directives should remain inside the course folder and should normally be course-relative.
 
-```text
-↓
-```
+## 8.2 Environment Setup
 
-Learner-facing output
-
-For routine work, remember:
-
-```text
-Edit source → Generate → Render → Review → Publish
-```
-
-Generated files should not normally become the primary editing source.
-
-## 8.2 Starting a Terminal Session
-
-Move to the Learning Publisher project:
+Create and activate the environment on macOS or Linux:
 
 ```bash
-cd cloudpedagogy-learning-publisher
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-Activate the Python environment:
+On later sessions:
 
 ```bash
 source .venv/bin/activate
 ```
 
-The command prompt will normally indicate that the environment is
-```yaml
-active:
-```
-
-(.venv) user@computer learning-publisher %
-
-If the virtual environment does not yet exist:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-## 8.3 Check Python
-
-Check that Python is available:
+Check the tools:
 
 ```bash
 python --version
-```
-
-If required:
-
-```bash
-python3 --version
-```
-
-When the virtual environment is active, python should normally refer to
-the Python interpreter within that environment.
-
-## 8.4 Check Quarto
-
-Check that Quarto is installed:
-
-```bash
 quarto --version
+pandoc --version
 ```
 
-If a version number is returned, Quarto is available from the current
-shell.
-
-If the command is not recognised, install or configure Quarto before
-attempting to render the generated course.
-
-## 8.5 Install Python Dependencies
-
-With the virtual environment active:
+Install TinyTeX when PDF output is required:
 
 ```bash
-pip install -r requirements.txt
+quarto install tinytex
 ```
 
-This installs the Python packages required by the current repository.
+## 8.3 CLI Help
 
-If dependencies change after updating Learning Publisher, rerun this
-command.
-
-## 8.6 Generate a Course
-
-The generation command uses the Learning Publisher script together with
-a course configuration file.
-
-The general pattern is:
+Show the main CLI help:
 
 ```bash
-python src/\<publisher-script\>.py config/<course>.yml
+python -m course_generator.cli --help
 ```
 
-Use the actual filenames provided by the current repository.
-
-The configuration identifies the course structure, source documents and
-associated publishing options.
-
-After generation, inspect the terminal output for warnings or errors
-before rendering.
-
-## 8.7 Render a Course
-
-Move to the generated Quarto project if necessary and run:
+Command-specific help:
 
 ```bash
-quarto render
+python -m course_generator.cli build --help
+python -m course_generator.cli render --help
 ```
 
-This generates the learner-facing output.
-
-For a Quarto website, the rendered site will normally be placed in the
-output directory configured by the project, commonly \_site/.
-
-## 8.8 Preview a Course
-
-During development:
+Handbook utility help:
 
 ```bash
-quarto preview
+python src/course_generator/tools/build_handbook_from_quarto.py --help
 ```
 
-Open the local address reported by Quarto.
+The installed package also defines the `coursegen` console entry point, but this handbook consistently uses the explicit `python -m course_generator.cli` form.
 
-Stop the preview server with:
+## 8.4 Standard Publishing Commands
 
-Ctrl+C
-
-Preview mode is preferable to opening individual HTML files directly
-when testing interactive components.
-
-## 8.9 Rebuild After Editing
-
-If you edit:
-
-- a Word document;
-
-- the course YAML;
-
-- an external R file;
-
-- a resource;
-
-- a custom interaction;
-
-- another source dependency;
-
-regenerate the course before publishing the new version.
-
-```yaml
-Use:
-```
-
-Edit
-
-```text
-↓
-```
-
-Generate
-
-```text
-↓
-Render
-↓
-```
-
-Review
-
-Do not assume that changing a source file automatically updates
-previously generated output.
-
-## 8.10 Source File Paths
-
-Use relative paths wherever possible.
+Validate:
 
 ```bash
-Prefer:
-source/session1/introduction.docx
-and:
-code/example.R
+python -m course_generator.cli validate imports/courses/my_course/course.yml
 ```
 
-rather than:
-
-/Users/name/Documents/course/example.R
-
-Relative paths make projects easier to move between computers, virtual
-machines and publishing environments.
-
-## 8.11 External R Source
-
-Where an R example is stored externally, use the supported
-```bash
-source-reference pattern.
-```
-
-For example:
-
-Source :: code/example.R
-
-Check that:
-
-- the path is correct;
-
-- the filename is correct;
-
-- the file exists;
-
-- the path is relative to the expected project location;
-
-- the .R file contains valid R code.
-
-If Learning Publisher cannot find the source file, check the path before
-changing the conversion code.
-
-## 8.12 Course Does Not Generate
-
-If generation fails, check the terminal error first.
-
-Common causes include:
-
-- virtual environment not activated;
-
-- missing Python dependencies;
-
-- incorrect configuration filename;
-
-- invalid YAML;
-
-- missing Word source document;
-
-- incorrect relative path;
-
-- missing supporting file;
-
-- unsupported or malformed authoring syntax.
-
-Work from the first meaningful error rather than attempting to correct
-several unrelated files simultaneously.
-
-A useful diagnostic sequence is:
-
-Did Python start?
-
-```text
-↓
-```
-
-Was the configuration found?
-
-```text
-↓
-```
-
-Could the YAML be read?
-
-```text
-↓
-```
-
-Were the Word files found?
-
-```text
-↓
-```
-
-Were referenced resources found?
-
-```text
-↓
-```
-
-Did transformation complete?
-
-## 8.13 Word Document Is Missing
-
-If Learning Publisher reports that a Word source cannot be found:
-
-1.  Check the filename.
-
-2.  Check the path in the YAML configuration.
-
-3.  Check capitalisation.
-
-4.  Confirm that the .docx file exists.
-
-5.  Confirm that the command is being run from the expected location.
-
-On Linux, filename capitalisation matters.
-
-For example:
-
-Introduction.docx
-
-```yaml
-and:
-```
-
-introduction.docx
-
-may be treated as different files.
-
-This is particularly important when moving a project from macOS or
-Windows to a Linux virtual machine.
-
-## 8.14 YAML Errors
-
-YAML depends on indentation and structure.
-
-For example:
-
-```yaml
-sessions:
-```
-
-\- title: "Introduction"
-
-```yaml
-pages:
-```
-
-\- title: "Welcome"
+Inspect the interpreted structure when useful:
 
 ```bash
-source: "source/welcome.docx"
+python -m course_generator.cli inspect imports/courses/my_course/course.yml
 ```
 
-Incorrect indentation can prevent the configuration from being parsed
-correctly.
-
-When a YAML error is reported:
-
-- inspect the indicated line;
-
-- check indentation;
-
-- check quotation marks;
-
-- check list markers;
-
-- check for duplicated or malformed keys.
-
-Use spaces rather than tabs for indentation.
-
-## 8.15 Page Is Missing from the Course
-
-If a Word document exists but its page does not appear in the course,
-check whether it is included in the course configuration.
-
-A file being present in the source directory does not necessarily mean
-that Learning Publisher will publish it.
-
-The relationship should be explicit:
-
-```text
-Word document
-↓
-```
-
-Referenced by course YAML
-
-```text
-↓
-```
-
-Generated page
-
-Also check that the page has not been deliberately disabled or excluded
-through configuration.
-
-## 8.16 Page Order Is Wrong
-
-Page and session order should normally be controlled by the course
-configuration.
-
-If pages appear in the wrong order, correct the YAML rather than
-manually rearranging generated files.
-
-Then regenerate the course.
-
-## 8.17 Heading Is Incorrect
-
-If a heading is rendered incorrectly:
-
-1.  Open the Word source.
-
-2.  Check the Word style applied to the heading.
-
-3.  Use an actual Word heading style.
-
-4.  Regenerate the course.
-
-Do not fix the heading only in the generated .qmd file.
-
-## 8.18 Image Does Not Appear
-
-If an image is missing:
-
-- confirm that it exists in the Word source or referenced resources;
-
-- check any associated path;
-
-- check whether the image was copied into the generated project;
-
-- inspect the generated page;
-
-- inspect the browser developer console if necessary.
-
-If the image appears in Word but consistently disappears during
-generation, the problem may be in the transformation process.
-
-## 8.19 Alternative Text Is Missing
-
-Check the alternative text in the Word source first.
-
-If meaningful alternative text exists in Word but does not appear in the
-generated output, investigate whether it has been preserved during
-transformation.
-
-Do not add the alternative text only to the final HTML because that
-correction will be lost during regeneration.
-
-## 8.20 Link Does Not Work
-
-For a broken link, determine whether it is:
-
-- an external URL;
-
-- an internal course link;
-
-- a downloadable resource;
-
-- a generated navigation link.
-
-For an external URL, verify the destination independently.
-
-For a local resource, check the relative path and confirm that the
-resource has been included in the generated output.
-
-For navigation problems, check the course configuration.
-
-## 8.21 Downloadable File Is Missing
-
-Check that the file:
-
-- exists in the project;
-
-- is stored in the expected resources location;
-
-- is referenced using the correct relative path;
-
-- has been copied into the published output.
-
-Remember that publishing an HTML page alone does not automatically
-publish every local file on the computer.
-
-## 8.22 Quarto Render Fails
+Build:
 
 ```bash
-If:
-quarto render
+python -m course_generator.cli build imports/courses/my_course/course.yml
 ```
 
-fails, identify whether the problem originates in:
-
-Generated Quarto
-
-```text
-↓
-```
-
-Quarto configuration
-
-```text
-↓
-```
-
-Referenced resource
-
-```text
-↓
-Extension/component
-↓
-```
-
-Rendering dependency
-
-Read the first useful Quarto error message carefully.
-
-If the generated .qmd contains malformed output, determine whether the
-underlying Word source or Learning Publisher transformation produced it.
-
-Correct the source of the problem rather than repeatedly patching
-generated Quarto.
-
-## 8.23 Preview Works but Published Site Does Not
-
-If the course works with:
+Import Word:
 
 ```bash
-quarto preview
+python -m course_generator.cli import-word imports/courses/my_course/course.yml
 ```
 
-but fails after publication, check whether all generated site files were
-deployed.
+Build the handbook:
 
-Do not publish only:
-
-index.html
-
-A Quarto site commonly depends on:
-
-index.html
-
-other HTML pages
-
-```text
-site_libs/
-images/
-scripts/
-styles/
-resources/
+```bash
+python src/course_generator/tools/build_handbook_from_quarto.py build/courses/my_course
 ```
 
-Publish the complete generated site structure.
+Render:
 
-Also check for paths that refer incorrectly to files on the development
-computer.
+```bash
+python -m course_generator.cli render imports/courses/my_course/course.yml --no-versioned
+```
 
-## 8.24 WebR Does Not Load
+Open on macOS:
 
-If a WebR activity does not initialise, first establish whether the
-problem affects:
+```bash
+open output/courses/my_course/index.html
+```
 
-- one activity;
+Preview a single generated QMD page:
 
-- one page;
+```bash
+python -m course_generator.cli preview build/courses/my_course/path/to/page.qmd
+```
 
-- or every WebR activity.
+## 8.5 If Validation Fails
 
-```yaml
+Start with the error reported by:
+
+```bash
+python -m course_generator.cli validate imports/courses/my_course/course.yml
+```
+
 Check:
-```
 
-- browser console errors;
+- YAML indentation and syntax;
+- required module/session/section/subpage fields;
+- stable and unique IDs;
+- `source_docx` values;
+- filenames and letter case;
+- whether referenced files actually exist.
 
-- required WebR assets;
+The `source_docx` path is resolved from the folder containing `course.yml`.
 
-- network dependencies;
+## 8.6 If Build or Import Fails
 
-- generated JavaScript;
+Confirm that:
 
-- referenced R files;
+1. the virtual environment is active;
+2. the project was installed with `python -m pip install -e .`;
+3. the command is being run from the repository root;
+4. `validate` succeeds;
+5. `build` has been run before `import-word`;
+6. the Word documents exist under the configured course folder;
+7. Word temporary lock files beginning with `~$` are not being treated as source;
+8. external code and resource paths are course-relative and stay inside the course folder.
 
-- required packages;
+After editing Word, save and close the document before reimporting.
 
-- required data.
+## 8.7 If a Directive Appears as Ordinary Text
 
-If all WebR activities fail, investigate the shared WebR setup before
-changing individual R examples.
+Check the Word source against the supported syntax in [Learning Publisher Authoring Guide](AUTHORING_GUIDE.md).
 
-## 8.25 R Code Does Not Run
+In particular:
 
-If WebR loads but the R code fails:
+- directive keywords should be on their own paragraphs;
+- the metadata separator is `::`;
+- bounded blocks require the explicit matching `END ...` marker;
+- external source paths should be course-relative;
+- unsupported nesting should be avoided.
 
-1.  Test the R code independently where appropriate.
+Examples of supported components include reveals, self-checks, callouts, tabs, quizzes, R/WebR content, Python/Pyodide content, JavaScript interactions, images, downloadable files, video and standalone HTML.
 
-2.  Check package availability.
-
-3.  Check object names.
-
-4.  Check data paths.
-
-5.  Check whether the required functionality is supported in the browser
-    environment.
-
-6.  Read the WebR error message.
-
-Do not assume that code working in a local desktop R installation will
-necessarily work unchanged in WebR.
-
-## 8.26 Custom Interaction Does Not Work
-
-For custom HTML or JavaScript, check:
-
-- file paths;
-
-- JavaScript errors;
-
-- missing libraries;
-
-- missing CSS;
-
-- missing resources;
-
-- browser console output;
-
-- assumptions about the hosting environment.
-
-Test the interaction independently where possible before testing its
-integration into Learning Publisher.
-
-This helps distinguish:
-
-interaction problem
-
-```yaml
-from:
-```
-
-Learning Publisher integration problem
-
-## 8.27 Video Does Not Display
-
-For YouTube or Panopto content, check:
-
-- the video reference;
-
-- embed configuration;
-
-- network access;
-
-- institutional restrictions;
-
-- video permissions.
-
-For Panopto, a technically correct embed can still fail for a learner
-who does not have permission to view the recording.
-
-## 8.28 Changes Disappear After Regeneration
-
-If a correction disappears after running Learning Publisher again, it
-was probably made in a generated file.
+## 8.8 If an External File Is Not Found
 
 For example:
 
-Word
+```text
+Source :: code/example.R
+```
+
+or:
 
 ```text
-↓
+Image :: resources/images/example.png
 ```
 
-Generated .qmd ← manually edited
+check:
 
-```text
-↓
-```
+- the path is relative to the course folder;
+- the file is inside the course folder;
+- the extension is correct;
+- filename case matches exactly;
+- no absolute or `../` path leaves the course directory.
 
-Regenerate
+Case mismatches are particularly important when moving a project to Linux.
 
-```text
-↓
-```
+## 8.9 If R Content Fails
 
-manual edit disappears
+For static R:
 
-Make the correction in the maintainable source instead.
+- confirm that system R is installed;
+- confirm that required R packages are available;
+- test the R source independently where useful;
+- check local data paths;
+- confirm that `R Mode :: static` and related options are appropriate.
 
-Depending on the issue, this may be:
+For WebR:
 
-- Word;
+- test the learner-facing browser activity;
+- confirm the configured Quarto WebR extension and required assets are available;
+- confirm required data is staged correctly;
+- for package-dependent examples, confirm the lazy missing-package handler is enabled and the package is browser-compatible;
+- expect the first execution of a new package to take longer while dependencies are downloaded.
 
-- YAML;
+A script that works in desktop R is not by itself proof that a WebR activity will behave correctly.
 
-- R;
+## 8.10 If Python or Pyodide Content Fails
 
-- a resource;
+For static Python display, confirm that `Language :: python`, `Mode :: static` and any `Source ::` path are correct.
 
-- an interaction;
+For Pyodide:
 
-- a Learning Publisher template;
+- confirm `Mode :: pyodide`;
+- confirm external `.py` files exist inside the course folder;
+- confirm each `Data ::` file exists and remains inside the course folder;
+- read staged files from `data/<filename>` inside Python;
+- allow extra time on first use when pandas, Matplotlib or another compatible package must load;
+- inspect the browser console for runtime, network or package-loading errors when an activity does not start;
+- remember that not every Python package is necessarily Pyodide-compatible.
 
-- transformation code.
+Pyodide and WebR can run on the same page; if one runtime fails, test the other independently to identify whether the problem is runtime-specific or page-wide.
 
-Then regenerate.
+## 8.11 If a JavaScript or HTML Interaction Fails
 
-## 8.29 Old Content Still Appears
+Plain JavaScript interactions use a course-local `.js` file, normally under `code/`, with the `JavaScript Interaction` directive. Standalone HTML activities are separate and should be stored under `resources/html/`.
 
-If removed or changed content appears to persist:
+Check:
 
-- confirm that the correct source was edited;
+- source path;
+- required directive fields;
+- unique container ID;
+- browser console errors;
+- missing assets or libraries;
+- keyboard operation and labels;
+- assumptions about external internet access.
 
-- regenerate the project;
+Use the HTML component when the activity is already a complete HTML document rather than a single JavaScript interaction.
 
-- rerender the course;
+## 8.12 If Rendering Fails
 
-- check that you are viewing the new output;
+The `render` command invokes Quarto against the generated project. Check:
 
-- refresh the browser;
+- that `build/courses/my_course/` exists;
+- that import completed;
+- Quarto error output;
+- missing generated resources;
+- static R or TinyTeX dependencies where relevant.
 
-- check whether old generated files remain in the output directory.
+Correct the maintainable source or publishing process rather than repeatedly patching generated files.
 
-Where appropriate, rebuild from a clean generated output directory.
+## 8.13 If Changes Do Not Appear
 
-Be careful not to delete maintainable source material when cleaning
-generated files.
+Confirm that:
 
-## 8.30 Problems After Updating the Repository
+1. the correct Word/YAML/code/resource source was edited;
+2. Word was saved and closed;
+3. the required import/handbook/render stages were rerun;
+4. you are opening the newest output under `output/courses/my_course/`;
+5. you are not viewing an older browser tab or versioned release.
 
-After pulling a newer version of Learning Publisher, check whether
-dependencies have changed.
+If navigation or `course.yml` changed, rerun the complete five-stage pipeline.
 
-With the environment activated:
+## 8.14 If the Website Works Locally but Not After Deployment
 
-```bash
-pip install -r requirements.txt
-```
+Deploy the complete rendered output directory rather than only `index.html`.
 
-Then regenerate a known working demonstration course.
+Check for:
 
-This provides a quick check that the updated environment still supports
-the expected workflow.
+- missing scripts, styles, images or downloads;
+- broken relative paths;
+- filename case mismatches;
+- restricted video permissions;
+- external dependencies that are unavailable in the target environment.
 
-## 8.31 Git Reference
+## 8.15 Updating the Repository
 
-Check repository status:
+Check local status:
 
 ```bash
 git status
 ```
 
-Pull current changes:
+Pull changes:
 
 ```bash
 git pull
 ```
 
-Stage a changed file:
+After changes to the Python project or dependencies, ensure the editable installation is current:
+
+```bash
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+Run automated tests after changing the Python application:
+
+```bash
+python -m pytest
+```
+
+## 8.16 Committing Documentation or Source Changes
+
+Check what changed:
+
+```bash
+git status
+```
+
+Stage intentional files:
 
 ```bash
 git add path/to/file
+```
+
 Commit:
+
+```bash
 git commit -m "Describe the change"
+```
+
 Push:
+
+```bash
 git push origin main
 ```
 
-For several intentional changes:
+Avoid committing temporary Word lock files, Python caches or other unintended generated material.
 
-```bash
-git add .
-git commit -m "Update Learning Publisher"
-git push origin main
-```
+## 8.17 Reporting a Reproducible Problem
 
-Always check:
-
-```bash
-git status
-```
-
-before committing so that unintended files are not included.
-
-## 8.32 Virtual Machine Reference
-
-When Learning Publisher is installed on a Linux virtual machine, the
-same core commands apply:
-
-```bash
-cd cloudpedagogy-learning-publisher
-source .venv/bin/activate
-```
-
-Then run the required Learning Publisher and Quarto commands.
-
-A virtual machine changes **where** the software runs, not the
-fundamental publishing model:
-
-Source
-
-```text
-↓
-```
-
-VM
-
-```text
-↓
-```
-
-Learning Publisher
-
-```text
-↓
-```
-
-Quarto
-
-```text
-↓
-```
-
-Output
-
-This makes it possible to provide a consistent environment for multiple
-users without requiring every user to configure the complete publishing
-stack on their own computer.
-
-## 8.33 Reporting a Problem
-
-When reporting an issue, provide enough information for the problem to
-be reproduced.
-
-Useful information includes:
-
-- Learning Publisher version or Git commit;
+Include:
 
 - operating system;
-
 - Python version;
-
 - Quarto version;
-
-- command used;
-
-- configuration involved;
-
-- relevant source example;
-
+- repository commit or version;
+- exact command used;
+- relevant `course.yml`;
+- minimal source needed to reproduce the issue;
 - complete error message;
+- whether the supplied demonstration course shows the same problem;
+- whether the failure occurs during validation, build, import, handbook generation, rendering or browser use.
 
-- whether the problem occurs in the demonstration course;
+A reproducible report is much easier to diagnose than a description of the final symptom alone.
 
-- whether the problem occurs during generation, rendering or browser
-  use.
+## 8.18 Troubleshooting Strategy
 
-A useful issue description follows:
-
-What I attempted
-
-What I expected
-
-What happened
-
-Command used
-
-Error message
-
-Minimal source/configuration needed to reproduce it
-
-Avoid reporting only:
-
-It doesn't work.
-
-Reproducible reports make problems substantially easier to diagnose.
-
-## 8.34 Troubleshooting Strategy
-
-When something fails, identify the stage at which it failed.
+Identify the failing layer:
 
 ```text
-Word/YAML/resources
-↓
+course.yml / Word / code / resources
+                ↓
+             SOURCE
+                ↓
+       Learning Publisher
+                ↓
+       BUILD / IMPORT
+                ↓
+        Generated Quarto
+                ↓
+             RENDER
+                ↓
+       Website / handbook
+                ↓
+        OUTPUT / BROWSER
 ```
 
-\[SOURCE\]
+Then fix the maintainable source or the relevant publishing stage and regenerate.
+
+## 8.19 Final Operating Principle
+
+The most important rule is:
+
+> **Fix the maintainable source or publishing process, not the generated symptom.**
+
+The current routine pipeline is:
 
 ```text
-↓
+Validate → Build → Import Word → Build handbook → Render
 ```
 
-Learning Publisher
-
-```text
-↓
-```
-
-\[GENERATION\]
-
-```text
-↓
-```
-
-Generated Quarto
-
-```text
-↓
-```
-
-Quarto
-
-```text
-↓
-```
-
-\[RENDERING\]
-
-```text
-↓
-```
-
-HTML / PDF
-
-```text
-↓
-```
-
-\[BROWSER / OUTPUT\]
-
-Then investigate that stage rather than changing unrelated parts of the
-project.
-
-```yaml
-Ask:
-```
-
-**Source problem?**
-
-Check Word, YAML, code and resources.
-
-**Generation problem?**
-
-Check Learning Publisher output and error messages.
-
-**Rendering problem?**
-
-Check Quarto and the generated .qmd.
-
-**Browser problem?**
-
-Check scripts, WebR, media, paths and browser console messages.
-
-This separation is one of the most effective ways to troubleshoot the
-publishing pipeline.
-
-## 8.35 Quick Command Reference
-
-Create an environment:
-
-```bash
-python3 -m venv .venv
-```
-
-Activate it:
-
-```bash
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Check Python:
-
-```bash
-python --version
-```
-
-Check Quarto:
-
-```bash
-quarto --version
-```
-
-Generate a course:
-
-```bash
-python src/\<publisher-script\>.py config/<course>.yml
-Render:
-quarto render
-Preview:
-quarto preview
-```
-
-Check Git:
-
-```bash
-git status
-```
-
-Pull updates:
-
-```bash
-git pull
-```
-
-Push committed changes:
-
-```bash
-git push origin main
-```
-
-## 8.36 Final Operating Principle
-
-Learning Publisher is designed around a reproducible publishing model:
-
-Maintain structured source
-
-```text
-↓
-```
-
-Generate consistently
-
-```text
-↓
-```
-
-Render reproducibly
-
-```text
-↓
-```
-
-Review learner-facing output
-
-```text
-↓
-```
-
-Correct the source
-
-```text
-↓
-```
-
-Regenerate
-
-The most important troubleshooting rule is therefore:
-
-**Fix the maintainable source or publishing process, not the generated
-symptom.**
-
-Following this principle keeps Learning Publisher projects easier to
-review, reproduce, maintain and extend as course content and the
-publishing system evolve.
+Following that model keeps Learning Publisher courses reproducible, reviewable and maintainable.
