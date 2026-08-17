@@ -2,6 +2,12 @@
 
 CloudPedagogy Learning Publisher is a Word-first publishing system for creating accessible, maintainable online learning with Quarto. Authors work primarily in Microsoft Word, while a course-local YAML file defines structure, navigation, source documents and publication settings.
 
+**Author in Word. Publish as interactive learning.**
+
+Learning Publisher separates maintainable academic authoring from the technical complexity of digital delivery. Subject specialists can create, edit and review content in familiar Microsoft Word documents, while the publishing layer transforms that source into structured web-based learning incorporating learning interactions, media, browser-based R and Python, and bespoke interactive experiences.
+
+This keeps the academic source familiar and maintainable while allowing the published learning experience to become substantially richer without requiring authors to maintain the underlying web implementation.
+
 ## What it produces
 
 Depending on the course configuration, Learning Publisher can create:
